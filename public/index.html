@@ -3104,8 +3104,9 @@ function openSyncModal() {
     content.innerHTML =
       '<h3>☁ 云同步设置</h3>' +
       '<p>当前口令：<strong style="color:var(--cyan)">' + '\u2022'.repeat(Math.min(passphrase.length, 12)) + '</strong></p>' +
-      '<p style="font-size:12px;color:var(--text-faint)">数据保存时自动同步到云端，打开页面时自动拉取。</p>' +
+      '<p style="font-size:12px;color:var(--text-faint)">数据保存时自动同步到云端，打开页面时自动拉取。<br>云端数据超过 30 天未同步将自动清除。</p>' +
       '<div class="sync-modal-actions">' +
+        '<button class="sync-btn" onclick="changeSyncPassphrase()">修改口令</button>' +
         '<button class="sync-btn" onclick="clearSyncPassphrase()">清除口令</button>' +
         '<button class="sync-btn" onclick="manualSyncPull()">手动拉取</button>' +
         '<button class="sync-btn primary" onclick="closeSyncModal()">关闭</button>' +
@@ -3137,6 +3138,8 @@ function closeSyncModal() {
   if (el) { el.classList.remove('show'); el.style.display = 'none'; }
 }
 
+var _isFirstSync = false;
+
 async function confirmSyncPassphrase() {
   var inp = document.getElementById('syncPassphraseInput');
   if (!inp) return;
@@ -3149,7 +3152,15 @@ async function confirmSyncPassphrase() {
   localStorage.setItem(SYNC_PASSPHRASE_KEY, passphrase);
   closeSyncModal();
   showToast('同步口令已设置');
+  _isFirstSync = true;
   await syncOnLoad();
+  _isFirstSync = false;
+}
+
+function changeSyncPassphrase() {
+  localStorage.removeItem(SYNC_PASSPHRASE_KEY);
+  updateSyncStatus('off');
+  openSyncModal();
 }
 
 function clearSyncPassphrase() {
@@ -3240,38 +3251,52 @@ async function syncOnLoad() {
       updateSyncStatus('synced');
       return;
     }
-    showSyncConflictDialog(localMod, cloudMod, cloud.data);
+    showSyncConflictDialog(localMod, cloudMod, cloud.data, _isFirstSync);
   } catch(e) {
     console.error('Sync load error:', e);
     updateSyncStatus('error');
   }
 }
 
-function showSyncConflictDialog(localMod, cloudMod, cloudData) {
+function showSyncConflictDialog(localMod, cloudMod, cloudData, isFirstSync) {
   _syncCloudCache = { data: cloudData, modified: cloudMod };
   var localAcc = DATA.accounts ? DATA.accounts.length : 0;
   var cloudAcc = cloudData && cloudData.accounts ? cloudData.accounts.length : 0;
   var overlay = document.getElementById('syncModalOverlay');
   var content = document.getElementById('syncModalContent');
-  content.innerHTML =
-    '<h3>\u26a0 数据不一致</h3>' +
-    '<p>本地数据和云端数据不一致，请选择保留哪一份：</p>' +
+  var title = isFirstSync ? '<h3>\u26a0 该口令已有云端数据</h3>' : '<h3>\u26a0 数据不一致</h3>';
+  var desc = isFirstSync
+    ? '<p>该口令下已有云端数据，请确认是否为你的数据。如果不是，请更换口令。</p>'
+    : '<p>本地数据和云端数据不一致，请选择保留哪一份：</p>';
+  var actions = isFirstSync
+    ? '<div class="sync-conflict-actions">' +
+        '<button class="sync-btn" onclick="resolveConflict(\'change\')" style="flex:1">换一个口令</button>' +
+        '<button class="sync-btn use-cloud" onclick="resolveConflict(\'cloud\')" style="flex:1">这是我的数据</button>' +
+      '</div>'
+    : '<div class="sync-conflict-actions">' +
+        '<button class="sync-btn use-local" onclick="resolveConflict(\'local\')" style="flex:1">使用本地数据</button>' +
+        '<button class="sync-btn use-cloud" onclick="resolveConflict(\'cloud\')" style="flex:1">使用云端数据</button>' +
+      '</div>';
+  content.innerHTML = title + desc +
     '<div class="sync-conflict-info">' +
       '<div class="sync-conflict-row"><span class="label">\ud83d\udcf1 本地数据</span><span class="time">' + formatSyncTime(localMod) + '</span></div>' +
       '<div class="sync-conflict-row" style="font-size:12px;color:var(--text-faint)"><span>' + localAcc + ' 个账号</span></div>' +
       '<div style="border-top:1px solid var(--border);margin:8px 0"></div>' +
       '<div class="sync-conflict-row"><span class="label">☁ 云端数据</span><span class="time">' + formatSyncTime(cloudMod) + '</span></div>' +
       '<div class="sync-conflict-row" style="font-size:12px;color:var(--text-faint)"><span>' + cloudAcc + ' 个账号</span></div>' +
-    '</div>' +
-    '<div class="sync-conflict-actions">' +
-      '<button class="sync-btn use-local" onclick="resolveConflict(\'local\')" style="flex:1">使用本地数据</button>' +
-      '<button class="sync-btn use-cloud" onclick="resolveConflict(\'cloud\')" style="flex:1">使用云端数据</button>' +
-    '</div>';
+    '</div>' + actions;
   overlay.classList.add('show');
   overlay.style.display = 'flex';
 }
 
 async function resolveConflict(choice) {
+  if (choice === 'change') {
+    localStorage.removeItem(SYNC_PASSPHRASE_KEY);
+    updateSyncStatus('off');
+    _syncCloudCache = null;
+    openSyncModal();
+    return;
+  }
   closeSyncModal();
   if (choice === 'local') {
     await syncPush();

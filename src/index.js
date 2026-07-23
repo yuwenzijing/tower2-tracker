@@ -31,7 +31,7 @@ async function handleSync(request, env) {
     } catch (e) {
       return jsonResponse({ error: 'Invalid JSON' }, 400);
     }
-    await env.SYNC_KV.put(token, body);
+    await env.SYNC_KV.put(token, body, { expirationTtl: 30 * 24 * 3600 });
     return jsonResponse({ success: true });
   }
 
