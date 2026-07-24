@@ -1793,6 +1793,7 @@ const CLASS_ICONS = {
 // ====== 全局状态 ======
 let DATA = { accounts: [] };
 let dirtyChars = new Set();
+let dirtyAccounts = new Set();
 let simpleMode = false;
 let sortState = { column: null, direction: null };
 
@@ -1802,7 +1803,9 @@ function charKey(accId, charId) { return `${accId}/${charId}`; }
 
 function markDirty(accId, charId) { dirtyChars.add(charKey(accId, charId)); }
 function isDirty(accId, charId) { return dirtyChars.has(charKey(accId, charId)); }
+function markAccountDirty(accId) { dirtyAccounts.add(accId); }
 function isAccountDirty(accId) {
+  if (dirtyAccounts.has(accId)) return true;
   const acc = DATA.accounts.find(a => a.id === accId);
   if (!acc) return false;
   return acc.characters.some(ch => isDirty(accId, ch.id));
@@ -2101,11 +2104,9 @@ function toggleDirective(accId, key) {
   var acc = DATA.accounts.find(function(a) { return a.id === accId; });
   if (!acc) return;
   if (!acc.directives) acc.directives = {};
-  var wasDone = isDirectiveDone(acc, key);
-  acc.directives[key] = wasDone ? null : new Date().toISOString();
-  saveData();
+  acc.directives[key] = isDirectiveDone(acc, key) ? null : new Date().toISOString();
+  markAccountDirty(accId);
   render();
-  showToast(wasDone ? '已取消' : '已完成');
 }
 
 // 待办切换
@@ -2305,6 +2306,7 @@ function saveAccount(accId) {
   if (!isAccountDirty(accId)) return;
   saveData();
   acc.characters.forEach(ch => dirtyChars.delete(charKey(accId, ch.id)));
+  dirtyAccounts.delete(accId);
   render();
   showToast('账号数据已保存');
 }
@@ -2995,6 +2997,7 @@ function importData(event) {
       obj.accounts.forEach(ensureAccDefaults);
       DATA = obj;
       dirtyChars.clear();
+      dirtyAccounts.clear();
       saveData();
       render();
       showToast('数据导入成功');
@@ -3534,6 +3537,7 @@ async function resolveConflict(choice) {
     DATA = cd;
     DATA._lastModified = _syncCloudCache.modified;
     dirtyChars.clear();
+    dirtyAccounts.clear();
     localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
     render();
     updateSyncStatus('synced');
