@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>永恒之塔2 · 统计 V1.1.2</title>
+<title>永恒之塔2 · 统计</title>
 <style>
   :root {
     --bg: #080c16;
@@ -44,7 +44,7 @@
   /* ===== Header ===== */
   header {
     text-align: center;
-    padding: 30px 20px 18px;
+    padding: 22px 20px 14px;
     border-bottom: 1px solid var(--glass-border);
     background: linear-gradient(180deg, rgba(34,221,255,0.07), rgba(90,170,255,0.02), transparent);
     backdrop-filter: var(--glass-blur);
@@ -60,11 +60,68 @@
     letter-spacing: 3px;
     text-shadow: 0 0 30px rgba(34,221,255,0.15);
   }
-  header .subtitle {
-    margin-top: 8px;
+  .version-tag {
+    font-size: 13px;
+    font-weight: 400;
+    -webkit-text-fill-color: var(--text-faint);
+    opacity: 0.7;
+    letter-spacing: 1px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+
+  /* ===== Today Activities ===== */
+  .today-activities {
+    background: var(--glass-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 0;
+    overflow: hidden;
+    flex-shrink: 0;
+    min-width: 160px;
+    max-width: 220px;
+  }
+  .today-activities-head {
+    padding: 8px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--glass-border);
+    background: rgba(34,221,255,0.04);
+  }
+  .today-activities-body {
+    position: relative;
+    overflow: hidden;
+    min-height: 32px;
+  }
+  .activity-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
     font-size: 13px;
     color: var(--text-dim);
-    letter-spacing: 0.5px;
+    transition: color 0.3s, background 0.3s;
+    white-space: nowrap;
+  }
+  .activity-item .act-time {
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+  .activity-item .act-name {
+    color: var(--text);
+  }
+  .activity-item.urgent .act-time,
+  .activity-item.urgent .act-name {
+    color: var(--red);
+    font-weight: 600;
+  }
+  .activity-item.urgent {
+    background: rgba(255,128,128,0.06);
   }
 
   /* ===== Summary Bar ===== */
@@ -150,20 +207,24 @@
   }
   .cap-names {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 4px;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
+    align-content: flex-start;
     flex: 1;
+    max-height: calc(32px * 3 + 8px);
   }
   .cap-name-badge {
-    padding: 5px 14px;
+    padding: 4px 14px;
     border-radius: 8px;
     background: rgba(255,128,128,0.08);
     border: 1px solid rgba(255,128,128,0.25);
     color: var(--red);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    line-height: 1.4;
     transition: all 0.2s;
     user-select: none;
     backdrop-filter: blur(6px);
@@ -280,15 +341,36 @@
     background: var(--bg-card);
     border: 1px solid var(--border-glow);
     border-radius: var(--radius);
-    padding: 24px;
-    max-width: 400px;
+    padding: 24px 24px 20px;
+    max-width: 480px;
+    position: relative;
     width: 90%;
     box-shadow: var(--shadow);
   }
+  .sync-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    line-height: 1;
+  }
+  .sync-modal-close:hover { color: var(--text); border-color: var(--text-dim); background: rgba(255,255,255,0.04); }
   .sync-modal h3 {
     font-size: 16px;
     margin-bottom: 16px;
     color: var(--text);
+    padding-right: 36px;
   }
   .sync-modal p {
     font-size: 13px;
@@ -311,16 +393,21 @@
   .sync-input:focus { border-color: var(--cyan); }
   .sync-input::placeholder { color: var(--text-faint); }
   .sync-modal-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
-    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .sync-modal-actions.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
   }
   .sync-btn {
-    padding: 8px 18px;
+    padding: 10px 8px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--glass-bg);
     color: var(--text-dim);
+    white-space: nowrap;
     cursor: pointer;
     font-size: 13px;
     transition: all 0.2s;
@@ -541,6 +628,60 @@
   }
   .icon-btn:hover { background: var(--bg-card-hover); color: var(--text); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   .icon-btn.danger:hover { color: var(--red); border-color: rgba(255,80,80,0.3); background: rgba(255,80,80,0.06); }
+
+  /* ===== Directive Section (账号指令书) ===== */
+  .directive-section {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-bottom: 1px solid var(--glass-border);
+    flex-wrap: wrap;
+  }
+  .directive-label {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-right: 6px;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+  }
+  .directive-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+    font-size: 13px;
+  }
+  .directive-item:hover { background: rgba(255,255,255,0.04); }
+  .directive-item .todo-checkbox {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    border: 1.5px solid var(--text-faint);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: transparent;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .directive-item.done {
+    border-color: rgba(90,232,144,0.15);
+    background: rgba(90,232,144,0.05);
+  }
+  .directive-item.done .todo-checkbox {
+    border-color: var(--green);
+    background: var(--green);
+    color: var(--bg);
+    box-shadow: 0 0 6px rgba(90,232,144,0.3);
+  }
+  .directive-item.done .todo-label {
+    color: var(--green);
+  }
 
   /* ===== Character List ===== */
   .char-list {
@@ -1236,6 +1377,22 @@
   .mem-alert-confirm:hover { opacity: 0.85; }
 
   /* ===== 基纳图标按钮（统计框行最左圆形） ===== */
+  .kina-summary-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .kina-summary-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    opacity: 0.55;
+  }
+
   .kina-icon-btn {
     display: flex;
     align-items: center;
@@ -1433,10 +1590,15 @@
   /* ===== Responsive ===== */
   @media (max-width: 767px) {
     header h1 { font-size: 20px; }
+    .version-tag { font-size: 11px; }
     .summary-chip { min-width: 100px; padding: 8px 14px; }
     .summary-chip .val { font-size: 18px; }
     .account-header { gap: 8px; }
     .acc-stats { gap: 10px; }
+    .today-activities { max-width: 100%; min-width: auto; position: static; transform: none; order: -1; width: 100%; }
+    .kina-summary-val { font-size: 16px; }
+    .directive-section { gap: 4px; padding: 6px 14px; }
+    .directive-item { padding: 3px 6px; font-size: 12px; }
   }
   @media (min-width: 768px) {
     .char-list {
@@ -1458,15 +1620,18 @@
     }
     .summary-chip { flex: 0 0 auto; }
     .cap-names { flex: 0 1 auto; justify-content: center; }
-    .kina-icon-btn {
+    .today-activities {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .kina-summary-group {
       position: absolute;
       right: 20px;
       top: 50%;
       transform: translateY(-50%);
       margin-left: 0;
-    }
-    .kina-icon-btn:hover {
-      transform: translateY(-50%) scale(1.08);
     }
     .char-list { grid-template-columns: 1fr 1fr 1fr; }
   }
@@ -1475,12 +1640,15 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计</h1>
-  <div class="subtitle">多账号/多角色奥德追踪 · 奎灵会员3小时阶梯恢复 · 白奥德(840)+蓝奥德(2000)+背包奥德</div>
+  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.1.3</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
 <div class="summary-bar" id="summaryBar">
+  <div class="today-activities" id="todayActivities" style="display:none">
+    <div class="today-activities-head">今日活动</div>
+    <div class="today-activities-body" id="todayActivitiesBody"></div>
+  </div>
   <div class="summary-chip gold">
     <div class="val" id="sumDungeon">0</div>
     <div class="label">剩余副本次数</div>
@@ -1497,7 +1665,9 @@
   <div class="cap-names" id="capNames">
     <span class="cap-names-empty">暂无角色今日达到上限</span>
   </div>
-  <button class="kina-icon-btn" onclick="openKinaModal()" title="基纳统计" aria-label="基纳统计">
+  <div class="kina-summary-group">
+    <span class="kina-summary-val" id="kinaSummaryVal">0</span>
+    <button class="kina-icon-btn" onclick="openKinaModal()" title="基纳统计" aria-label="基纳统计">
     <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <radialGradient id="kinaG1" cx="50%" cy="35%" r="70%">
@@ -1512,6 +1682,7 @@
       <text x="20" y="29.8" text-anchor="middle" font-size="9.5" font-weight="800" fill="#7a5a08" font-family="sans-serif" letter-spacing="0.5">统计</text>
     </svg>
   </button>
+  </div>
 </div>
 </div>
 
@@ -1648,6 +1819,7 @@ const CLASS_ICONS = {
 // ====== 全局状态 ======
 let DATA = { accounts: [] };
 let dirtyChars = new Set();
+let dirtyAccounts = new Set();
 let simpleMode = false;
 let sortState = { column: null, direction: null };
 
@@ -1657,7 +1829,9 @@ function charKey(accId, charId) { return `${accId}/${charId}`; }
 
 function markDirty(accId, charId) { dirtyChars.add(charKey(accId, charId)); }
 function isDirty(accId, charId) { return dirtyChars.has(charKey(accId, charId)); }
+function markAccountDirty(accId) { dirtyAccounts.add(accId); }
 function isAccountDirty(accId) {
+  if (dirtyAccounts.has(accId)) return true;
   const acc = DATA.accounts.find(a => a.id === accId);
   if (!acc) return false;
   return acc.characters.some(ch => isDirty(accId, ch.id));
@@ -1939,6 +2113,28 @@ function setTrialLv(accId, charId, val) {
   markDirty(accId, charId); render();
 }
 
+// ====== 指令书（账号维度待办，周三3:00重置） ======
+var DIRECTIVE_ITEMS = [
+  { key: 'altgard', label: '亚尔特盖德' },
+  { key: 'morheim', label: '莫尔海姆' },
+  { key: 'abyssLower', label: '深渊下层' },
+  { key: 'abyssMiddle', label: '深渊中层' }
+];
+
+function isDirectiveDone(acc, key) {
+  if (!acc.directives || !acc.directives[key]) return false;
+  return new Date(acc.directives[key]) > getSanctuaryResetPoint();
+}
+
+function toggleDirective(accId, key) {
+  var acc = DATA.accounts.find(function(a) { return a.id === accId; });
+  if (!acc) return;
+  if (!acc.directives) acc.directives = {};
+  acc.directives[key] = isDirectiveDone(acc, key) ? null : new Date().toISOString();
+  markAccountDirty(accId);
+  render();
+}
+
 // 待办切换
 function toggleAwakening(accId, charId) {
   const acc = DATA.accounts.find(a => a.id === accId);
@@ -2066,6 +2262,7 @@ function ensureAccDefaults(acc) {
   if (acc.membershipDays === undefined) acc.membershipDays = null;
   if (acc.membershipHours === undefined) acc.membershipHours = null;
   if (acc.membershipSetAt === undefined) acc.membershipSetAt = null;
+  if (!acc.directives) acc.directives = {};
   if (!acc.characters) acc.characters = [];
   acc.characters.forEach(ensureCharDefaults);
 }
@@ -2135,6 +2332,7 @@ function saveAccount(accId) {
   if (!isAccountDirty(accId)) return;
   saveData();
   acc.characters.forEach(ch => dirtyChars.delete(charKey(accId, ch.id)));
+  dirtyAccounts.delete(accId);
   render();
   showToast('账号数据已保存');
 }
@@ -2490,6 +2688,15 @@ function render() {
           <button class="icon-btn danger" onclick="removeAccount('${acc.id}')" title="删除账号">✕</button>
         </div>
       </div>
+      <div class="directive-section">
+        <span class="directive-label">指令书</span>
+        ${DIRECTIVE_ITEMS.map(function(d) {
+          var done = isDirectiveDone(acc, d.key);
+          return '<div class="directive-item ' + (done ? 'done' : '') + '" onclick="toggleDirective(\'' + acc.id + '\',\'' + d.key + '\')">' +
+            '<div class="todo-checkbox">' + (done ? '✓' : '') + '</div>' +
+            '<span class="todo-label">' + d.label + '</span></div>';
+        }).join('')}
+      </div>
       <div class="char-list" id="charlist-${acc.id}"></div>
       <div style="padding:0 18px 14px">
         <button class="add-char-btn" onclick="addCharacter('${acc.id}')">+ 添加角色</button>
@@ -2664,6 +2871,10 @@ function render() {
 function updateRecoveryDisplay() {
   let todoChanged = false;
   DATA.accounts.forEach(acc => {
+    DIRECTIVE_ITEMS.forEach(function(d) {
+      var el = document.querySelector('.directive-item[onclick*="' + d.key + '"]');
+      if (el && el.classList.contains('done') !== isDirectiveDone(acc, d.key)) todoChanged = true;
+    });
     acc.characters.forEach(ch => {
       const charCard = document.getElementById(`char-${acc.id}-${ch.id}`);
       if (!charCard) return;
@@ -2767,6 +2978,15 @@ function updateSummary() {
       `<span class="cap-name-badge" onclick="jumpToChar('${n.accId}','${n.charId}')">${escapeHtml(n.name)}</span>`
     ).join('');
   }
+
+  var kinaSum = 0;
+  DATA.accounts.forEach(function(acc) {
+    acc.characters.forEach(function(ch) {
+      if (ch.kina !== null && ch.kina !== undefined && !isNaN(ch.kina)) kinaSum += ch.kina;
+    });
+  });
+  var kinaSumEl = document.getElementById('kinaSummaryVal');
+  if (kinaSumEl) kinaSumEl.textContent = formatKina(kinaSum);
 }
 
 // ====== 导入导出 ======
@@ -2803,6 +3023,7 @@ function importData(event) {
       obj.accounts.forEach(ensureAccDefaults);
       DATA = obj;
       dirtyChars.clear();
+      dirtyAccounts.clear();
       saveData();
       render();
       showToast('数据导入成功');
@@ -3038,6 +3259,7 @@ function saveKina() {
   kinaInitial = {};
   Object.keys(kinaDraft).forEach(k => { kinaInitial[k] = kinaDraft[k]; });
   updateKinaSaveBtn();
+  updateSummary();
   showToast('基纳数据已保存');
 }
 
@@ -3126,30 +3348,30 @@ function openSyncModal() {
   const passphrase = getSyncPassphrase();
   const overlay = document.getElementById('syncModalOverlay');
   const content = document.getElementById('syncModalContent');
+  var closeBtn = '<button class="sync-modal-close" onclick="closeSyncModal()" title="关闭">\u00d7</button>';
   if (location.protocol === 'file:') {
-    content.innerHTML =
+    content.innerHTML = closeBtn +
       '<h3>☁ 云同步</h3>' +
       '<p>云同步功能需要将页面部署到线上后才能使用。当前以本地文件方式打开，无法连接同步服务。</p>' +
-      '<p style="font-size:12px;color:var(--text-faint)">你仍然可以使用导出/导入功能手动传输数据。</p>' +
-      '<div class="sync-modal-actions"><button class="sync-btn primary" onclick="closeSyncModal()">知道了</button></div>';
+      '<p style="font-size:12px;color:var(--text-faint)">你仍然可以使用导出/导入功能手动传输数据。</p>';
   } else if (passphrase) {
-    content.innerHTML =
+    content.innerHTML = closeBtn +
       '<h3>☁ 云同步设置</h3>' +
-      '<p>当前口令：<strong style="color:var(--cyan)">' + '\u2022'.repeat(Math.min(passphrase.length, 12)) + '</strong></p>' +
+      '<p>当前口令：<strong style="color:var(--cyan)">' + escapeHtml(passphrase) + '</strong></p>' +
       '<p style="font-size:12px;color:var(--text-faint)">数据保存时自动同步到云端，打开页面时自动拉取。<br>云端数据超过 30 天未同步将自动清除。</p>' +
       '<div class="sync-modal-actions">' +
         '<button class="sync-btn" onclick="changeSyncPassphrase()">修改口令</button>' +
         '<button class="sync-btn" onclick="clearSyncPassphrase()">清除口令</button>' +
+        '<button class="sync-btn" onclick="manualSyncPush()">手动推送</button>' +
         '<button class="sync-btn" onclick="manualSyncPull()">手动拉取</button>' +
-        '<button class="sync-btn primary" onclick="closeSyncModal()">关闭</button>' +
       '</div>';
   } else {
-    content.innerHTML =
+    content.innerHTML = closeBtn +
       '<h3>☁ 设置同步口令</h3>' +
       '<p>设置一个口令用于跨设备同步数据。在另一台设备上输入相同口令即可获取数据。</p>' +
       '<input class="sync-input" id="syncPassphraseInput" type="text" placeholder="输入你的同步口令" autocomplete="off" />' +
       '<p style="font-size:12px;color:var(--text-faint)">口令是你的数据唯一标识，请牢记。忘记口令可通过导入/导出恢复数据。</p>' +
-      '<div class="sync-modal-actions">' +
+      '<div class="sync-modal-actions cols-2">' +
         '<button class="sync-btn" onclick="closeSyncModal()">取消</button>' +
         '<button class="sync-btn primary" onclick="confirmSyncPassphrase()">确认</button>' +
       '</div>';
@@ -3250,6 +3472,16 @@ async function manualSyncPull() {
   await syncOnLoad();
 }
 
+async function manualSyncPush() {
+  closeSyncModal();
+  await syncPush();
+  if (document.getElementById('syncStatus').classList.contains('error')) {
+    showToast('推送失败，请检查网络');
+  } else {
+    showToast('数据已推送到云端');
+  }
+}
+
 function formatSyncTime(iso) {
   if (!iso) return '无记录';
   try {
@@ -3341,6 +3573,7 @@ async function resolveConflict(choice) {
     DATA = cd;
     DATA._lastModified = _syncCloudCache.modified;
     dirtyChars.clear();
+    dirtyAccounts.clear();
     localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
     render();
     updateSyncStatus('synced');
@@ -3349,10 +3582,117 @@ async function resolveConflict(choice) {
   _syncCloudCache = null;
 }
 
+// ====== 今日活动 ======
+var _activityData = [
+  { day: 0, time: "22:00", name: "神将" },
+  { day: 2, time: "22:00", name: "深渊裂缝地带" },
+  { day: 3, time: "22:00", name: "神器战" },
+  { day: 4, time: "22:00", name: "深渊裂缝地带" },
+  { day: 5, time: "22:00", name: "神将" },
+  { day: 6, time: "22:00", name: "神器战" }
+];
+var _activityScrollTimer = null;
+var _activityScrollIdx = 0;
+var _activityPinned = false;
+
+var DAY_NAMES = ['周日','周一','周二','周三','周四','周五','周六'];
+
+function loadActivities() {
+  if (location.protocol === 'file:') { renderTodayActivities(); return; }
+  fetch('/activities.json?_t=' + Date.now())
+    .then(function(r) { return r.json(); })
+    .then(function(data) { _activityData = data; renderTodayActivities(); })
+    .catch(function() { renderTodayActivities(); });
+}
+
+function getTodayActivities() {
+  var now = new Date();
+  var today = now.getDay();
+  var items = [];
+  _activityData.forEach(function(act) {
+    if (act.day !== today) return;
+    var parts = act.time.split(':');
+    var actH = parseInt(parts[0], 10);
+    var actM = parseInt(parts[1], 10);
+    var actDate = new Date(now);
+    actDate.setHours(actH, actM, 0, 0);
+    var diff = actDate.getTime() - now.getTime();
+    if (diff < -60000) return;
+    var urgent = diff > 0 && diff <= 5 * 60 * 1000;
+    items.push({ time: act.time, name: act.name, urgent: urgent, diff: diff });
+  });
+  items.sort(function(a, b) { return a.diff - b.diff; });
+  return items;
+}
+
+function renderTodayActivities() {
+  var wrap = document.getElementById('todayActivities');
+  var body = document.getElementById('todayActivitiesBody');
+  if (!wrap || !body) return;
+  var items = getTodayActivities();
+  if (items.length === 0) { wrap.style.display = 'none'; stopActivityScroll(); return; }
+  wrap.style.display = '';
+  body.innerHTML = items.map(function(it, i) {
+    return '<div class="activity-item' + (it.urgent ? ' urgent' : '') + '" data-idx="' + i + '">' +
+      '<span class="act-time">' + it.time + '</span>' +
+      '<span class="act-name">' + it.name + '</span></div>';
+  }).join('');
+
+  if (items.length > 2) {
+    startActivityScroll(items);
+  } else {
+    stopActivityScroll();
+  }
+}
+
+function startActivityScroll(items) {
+  stopActivityScroll();
+  var body = document.getElementById('todayActivitiesBody');
+  if (!body) return;
+  var urgentIdx = -1;
+  items.forEach(function(it, i) { if (it.urgent && urgentIdx === -1) urgentIdx = i; });
+
+  if (urgentIdx !== -1) {
+    _activityPinned = true;
+    _activityScrollIdx = urgentIdx;
+    showActivityAtIndex(body, urgentIdx);
+  } else {
+    _activityPinned = false;
+    _activityScrollIdx = 0;
+    showActivityAtIndex(body, 0);
+  }
+
+  _activityScrollTimer = setInterval(function() {
+    if (_activityPinned) {
+      var fresh = getTodayActivities();
+      var stillUrgent = fresh.some(function(it) { return it.urgent; });
+      if (!stillUrgent) _activityPinned = false;
+      else return;
+    }
+    var allItems = body.querySelectorAll('.activity-item');
+    if (allItems.length <= 2) { stopActivityScroll(); return; }
+    _activityScrollIdx = (_activityScrollIdx + 1) % allItems.length;
+    showActivityAtIndex(body, _activityScrollIdx);
+  }, 4000);
+}
+
+function showActivityAtIndex(body, idx) {
+  var items = body.querySelectorAll('.activity-item');
+  items.forEach(function(el, i) {
+    el.style.display = (i === idx || i === idx + 1 || (idx === items.length - 1 && i === 0)) ? '' : 'none';
+  });
+}
+
+function stopActivityScroll() {
+  if (_activityScrollTimer) { clearInterval(_activityScrollTimer); _activityScrollTimer = null; }
+}
+
 // ====== Init ======
 loadData();
 render();
 checkMembershipAlert();
+loadActivities();
+setInterval(function() { renderTodayActivities(); }, 60000);
 setInterval(updateRecoveryDisplay, 30000);
 syncOnLoad();
 </script>
