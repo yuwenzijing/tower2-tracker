@@ -3074,8 +3074,15 @@ let _syncCloudCache = null;
 
 async function hashPassphrase(passphrase) {
   const enc = new TextEncoder().encode(passphrase);
-  const buf = await crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  if (crypto && crypto.subtle) {
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  var h = 0x811c9dc5;
+  for (var i = 0; i < enc.length; i++) { h ^= enc[i]; h = Math.imul(h, 0x01000193); }
+  var s = (h >>> 0).toString(16);
+  while (s.length < 64) s = s + s;
+  return s.substring(0, 64);
 }
 
 function getSyncPassphrase() { return localStorage.getItem(SYNC_PASSPHRASE_KEY); }
@@ -3191,6 +3198,7 @@ async function syncPush() {
   } catch(e) {
     console.error('Sync push error:', e);
     updateSyncStatus('error');
+    showToast('推送出错: ' + (e.message || e));
   }
 }
 
@@ -3255,6 +3263,7 @@ async function syncOnLoad() {
   } catch(e) {
     console.error('Sync load error:', e);
     updateSyncStatus('error');
+    showToast('同步出错: ' + (e.message || e));
   }
 }
 
