@@ -341,15 +341,36 @@
     background: var(--bg-card);
     border: 1px solid var(--border-glow);
     border-radius: var(--radius);
-    padding: 24px;
-    max-width: 400px;
+    padding: 24px 24px 20px;
+    max-width: 480px;
+    position: relative;
     width: 90%;
     box-shadow: var(--shadow);
   }
+  .sync-modal-close {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    line-height: 1;
+  }
+  .sync-modal-close:hover { color: var(--text); border-color: var(--text-dim); background: rgba(255,255,255,0.04); }
   .sync-modal h3 {
     font-size: 16px;
     margin-bottom: 16px;
     color: var(--text);
+    padding-right: 36px;
   }
   .sync-modal p {
     font-size: 13px;
@@ -372,16 +393,21 @@
   .sync-input:focus { border-color: var(--cyan); }
   .sync-input::placeholder { color: var(--text-faint); }
   .sync-modal-actions {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
     gap: 8px;
-    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  .sync-modal-actions.cols-2 {
+    grid-template-columns: repeat(2, 1fr);
   }
   .sync-btn {
-    padding: 8px 18px;
+    padding: 10px 8px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--glass-bg);
     color: var(--text-dim);
+    white-space: nowrap;
     cursor: pointer;
     font-size: 13px;
     transition: all 0.2s;
@@ -3322,30 +3348,30 @@ function openSyncModal() {
   const passphrase = getSyncPassphrase();
   const overlay = document.getElementById('syncModalOverlay');
   const content = document.getElementById('syncModalContent');
+  var closeBtn = '<button class="sync-modal-close" onclick="closeSyncModal()" title="关闭">\u00d7</button>';
   if (location.protocol === 'file:') {
-    content.innerHTML =
+    content.innerHTML = closeBtn +
       '<h3>☁ 云同步</h3>' +
       '<p>云同步功能需要将页面部署到线上后才能使用。当前以本地文件方式打开，无法连接同步服务。</p>' +
-      '<p style="font-size:12px;color:var(--text-faint)">你仍然可以使用导出/导入功能手动传输数据。</p>' +
-      '<div class="sync-modal-actions"><button class="sync-btn primary" onclick="closeSyncModal()">知道了</button></div>';
+      '<p style="font-size:12px;color:var(--text-faint)">你仍然可以使用导出/导入功能手动传输数据。</p>';
   } else if (passphrase) {
-    content.innerHTML =
+    content.innerHTML = closeBtn +
       '<h3>☁ 云同步设置</h3>' +
-      '<p>当前口令：<strong style="color:var(--cyan)">' + '\u2022'.repeat(Math.min(passphrase.length, 12)) + '</strong></p>' +
+      '<p>当前口令：<strong style="color:var(--cyan)">' + escapeHtml(passphrase) + '</strong></p>' +
       '<p style="font-size:12px;color:var(--text-faint)">数据保存时自动同步到云端，打开页面时自动拉取。<br>云端数据超过 30 天未同步将自动清除。</p>' +
       '<div class="sync-modal-actions">' +
         '<button class="sync-btn" onclick="changeSyncPassphrase()">修改口令</button>' +
         '<button class="sync-btn" onclick="clearSyncPassphrase()">清除口令</button>' +
+        '<button class="sync-btn" onclick="manualSyncPush()">手动推送</button>' +
         '<button class="sync-btn" onclick="manualSyncPull()">手动拉取</button>' +
-        '<button class="sync-btn primary" onclick="closeSyncModal()">关闭</button>' +
       '</div>';
   } else {
-    content.innerHTML =
+    content.innerHTML = closeBtn +
       '<h3>☁ 设置同步口令</h3>' +
       '<p>设置一个口令用于跨设备同步数据。在另一台设备上输入相同口令即可获取数据。</p>' +
       '<input class="sync-input" id="syncPassphraseInput" type="text" placeholder="输入你的同步口令" autocomplete="off" />' +
       '<p style="font-size:12px;color:var(--text-faint)">口令是你的数据唯一标识，请牢记。忘记口令可通过导入/导出恢复数据。</p>' +
-      '<div class="sync-modal-actions">' +
+      '<div class="sync-modal-actions cols-2">' +
         '<button class="sync-btn" onclick="closeSyncModal()">取消</button>' +
         '<button class="sync-btn primary" onclick="confirmSyncPassphrase()">确认</button>' +
       '</div>';
@@ -3444,6 +3470,16 @@ async function syncPull() {
 async function manualSyncPull() {
   closeSyncModal();
   await syncOnLoad();
+}
+
+async function manualSyncPush() {
+  closeSyncModal();
+  await syncPush();
+  if (document.getElementById('syncStatus').classList.contains('error')) {
+    showToast('推送失败，请检查网络');
+  } else {
+    showToast('数据已推送到云端');
+  }
 }
 
 function formatSyncTime(iso) {
