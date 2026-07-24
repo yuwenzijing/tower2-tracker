@@ -4,3 +4,7 @@ compatibility_date = "2024-09-23"
 
 [assets]
 directory = "./public"
+
+[[kv_namespaces]]
+binding = "SYNC_KV"
+id = "a820fd79771d44e4af9f83243556e101"
