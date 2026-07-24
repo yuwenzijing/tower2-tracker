@@ -3547,7 +3547,14 @@ async function resolveConflict(choice) {
 }
 
 // ====== 今日活动 ======
-var _activityData = [];
+var _activityData = [
+  { day: 0, time: "22:00", name: "神将" },
+  { day: 2, time: "22:00", name: "深渊裂缝地带" },
+  { day: 3, time: "22:00", name: "神器战" },
+  { day: 4, time: "22:00", name: "深渊裂缝地带" },
+  { day: 5, time: "22:00", name: "神将" },
+  { day: 6, time: "22:00", name: "神器战" }
+];
 var _activityScrollTimer = null;
 var _activityScrollIdx = 0;
 var _activityPinned = false;
@@ -3555,10 +3562,11 @@ var _activityPinned = false;
 var DAY_NAMES = ['周日','周一','周二','周三','周四','周五','周六'];
 
 function loadActivities() {
+  if (location.protocol === 'file:') { renderTodayActivities(); return; }
   fetch('/activities.json?_t=' + Date.now())
     .then(function(r) { return r.json(); })
     .then(function(data) { _activityData = data; renderTodayActivities(); })
-    .catch(function() { _activityData = []; renderTodayActivities(); });
+    .catch(function() { renderTodayActivities(); });
 }
 
 function getTodayActivities() {
