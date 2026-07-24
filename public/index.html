@@ -207,20 +207,24 @@
   }
   .cap-names {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 4px;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
+    align-content: flex-start;
     flex: 1;
+    max-height: calc(32px * 3 + 8px);
   }
   .cap-name-badge {
-    padding: 5px 14px;
+    padding: 4px 14px;
     border-radius: 8px;
     background: rgba(255,128,128,0.08);
     border: 1px solid rgba(255,128,128,0.25);
     color: var(--red);
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
+    line-height: 1.4;
     transition: all 0.2s;
     user-select: none;
     backdrop-filter: blur(6px);
@@ -639,14 +643,18 @@
     transition: all 0.15s;
     flex-shrink: 0;
   }
+  .directive-item.done {
+    border-color: rgba(90,232,144,0.15);
+    background: rgba(90,232,144,0.05);
+  }
   .directive-item.done .todo-checkbox {
-    background: var(--green);
     border-color: var(--green);
-    color: #fff;
+    background: var(--green);
+    color: var(--bg);
+    box-shadow: 0 0 6px rgba(90,232,144,0.3);
   }
   .directive-item.done .todo-label {
-    text-decoration: line-through;
-    opacity: 0.5;
+    color: var(--green);
   }
 
   /* ===== Character List ===== */
@@ -1346,7 +1354,7 @@
   .kina-summary-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
     margin-left: auto;
     flex-shrink: 0;
   }
@@ -1356,6 +1364,7 @@
     color: var(--gold);
     letter-spacing: 0.5px;
     white-space: nowrap;
+    opacity: 0.55;
   }
 
   .kina-icon-btn {
@@ -1560,7 +1569,7 @@
     .summary-chip .val { font-size: 18px; }
     .account-header { gap: 8px; }
     .acc-stats { gap: 10px; }
-    .today-activities { max-width: 100%; min-width: auto; }
+    .today-activities { max-width: 100%; min-width: auto; position: static; transform: none; order: -1; width: 100%; }
     .kina-summary-val { font-size: 16px; }
     .directive-section { gap: 4px; padding: 6px 14px; }
     .directive-item { padding: 3px 6px; font-size: 12px; }
@@ -1585,15 +1594,18 @@
     }
     .summary-chip { flex: 0 0 auto; }
     .cap-names { flex: 0 1 auto; justify-content: center; }
+    .today-activities {
+      position: absolute;
+      left: 20px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
     .kina-summary-group {
       position: absolute;
       right: 20px;
       top: 50%;
       transform: translateY(-50%);
       margin-left: 0;
-    }
-    .kina-summary-group:hover {
-      transform: translateY(-50%);
     }
     .char-list { grid-template-columns: 1fr 1fr 1fr; }
   }
@@ -2089,8 +2101,11 @@ function toggleDirective(accId, key) {
   var acc = DATA.accounts.find(function(a) { return a.id === accId; });
   if (!acc) return;
   if (!acc.directives) acc.directives = {};
-  acc.directives[key] = isDirectiveDone(acc, key) ? null : new Date().toISOString();
-  saveData(); render();
+  var wasDone = isDirectiveDone(acc, key);
+  acc.directives[key] = wasDone ? null : new Date().toISOString();
+  saveData();
+  render();
+  showToast(wasDone ? '已取消' : '已完成');
 }
 
 // 待办切换
