@@ -271,7 +271,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    cursor: pointer;
+    cursor: default;
     font-size: 13px;
     color: var(--text-dim);
     font-weight: 600;
@@ -309,27 +309,15 @@
   .tool-btn.export:hover { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 2px 12px rgba(34,221,255,0.12); }
   .tool-btn.import:hover { color: var(--gold); border-color: var(--gold); box-shadow: 0 2px 12px rgba(240,204,85,0.12); }
   .tool-btn.sync:hover { color: var(--green); border-color: var(--green); box-shadow: 0 2px 12px rgba(90,232,144,0.12); }
+  .tool-btn.sync.synced { color: var(--green); border-color: rgba(90,232,144,0.3); }
+  .tool-btn.sync.syncing { color: var(--blue); border-color: rgba(90,170,255,0.3); animation: syncPulse 1s infinite; }
+  .tool-btn.sync.error { color: var(--red); border-color: rgba(255,128,128,0.3); }
+  @keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+  .tool-btn.undo { transition: all 0.2s; }
+  .tool-btn.undo:not(:disabled):hover { color: var(--gold); border-color: var(--gold); box-shadow: 0 2px 12px rgba(240,204,85,0.12); }
+  .tool-btn.undo:disabled { opacity: 0.35; cursor: not-allowed; }
 
   /* ===== Sync ===== */
-  .sync-status {
-    font-size: 12px;
-    color: var(--text-faint);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex-shrink: 0;
-  }
-  .sync-status.synced { color: var(--green); }
-  .sync-status.syncing { color: var(--blue); }
-  .sync-status.error { color: var(--red); }
-  .sync-status .sync-dot {
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-    flex-shrink: 0;
-  }
-  .sync-status.syncing .sync-dot { animation: syncPulse 1s infinite; }
-  @keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
   .modal-overlay {
     position: fixed;
@@ -580,41 +568,6 @@
   .mem-time.urgent .mem-time-input,
   .mem-time.urgent .mem-time-unit { color: var(--red); font-weight: 800; }
 
-  /* ===== Account-level save & close buttons ===== */
-  .acc-save-btn {
-    padding: 5px 16px;
-    border-radius: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
-    border: 1px solid var(--border);
-    flex-shrink: 0;
-    color: var(--text-dim);
-    background: transparent;
-  }
-  .acc-save-btn.active {
-    background: rgba(240,204,85,0.10);
-    border-color: var(--gold);
-    color: var(--gold);
-    animation: glowGold 2.5s ease-in-out infinite;
-  }
-  .acc-save-btn.active:hover {
-    background: rgba(240,204,85,0.20);
-    box-shadow: 0 2px 12px rgba(240,204,85,0.15);
-  }
-  .acc-save-btn.disabled {
-    background: transparent;
-    border-color: var(--border);
-    color: var(--text-faint);
-    cursor: not-allowed;
-    opacity: 0.35;
-  }
-  @keyframes glowGold {
-    0%, 100% { box-shadow: 0 0 4px rgba(240,204,85,0.12); }
-    50% { box-shadow: 0 0 16px rgba(240,204,85,0.30); }
-  }
   .icon-btn {
     cursor: pointer;
     border: 1px solid var(--border);
@@ -727,6 +680,10 @@
     border-color: var(--gold) !important;
     box-shadow: 0 0 28px rgba(240,204,85,0.25), inset 0 0 40px rgba(240,204,85,0.03);
     animation: pulse 0.5s ease-in-out 3;
+  }
+  .char-card.selected {
+    border-color: var(--cyan) !important;
+    box-shadow: 0 0 20px rgba(34,221,255,0.12), inset 0 0 30px rgba(34,221,255,0.02);
   }
   @keyframes pulse {
     0%, 100% { transform: scale(1); }
@@ -897,6 +854,47 @@
     color: var(--gold-dim);
     font-weight: 600;
   }
+  .energy-ops {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .energy-op-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+    white-space: nowrap;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    user-select: none;
+  }
+  .energy-op-btn:not(:disabled):hover {
+    color: var(--text);
+    border-color: var(--text-dim);
+    background: var(--bg-card-hover);
+  }
+  .energy-op-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+  }
+  .energy-op-btn.sub { color: var(--red); border-color: rgba(255,128,128,0.2); }
+  .energy-op-btn.sub:not(:disabled):hover { border-color: var(--red); background: rgba(255,128,128,0.08); }
+  .energy-op-btn.add { color: var(--green); border-color: rgba(90,232,144,0.2); }
+  .energy-op-btn.add:not(:disabled):hover { border-color: var(--green); background: rgba(90,232,144,0.08); }
+  .energy-op-btn.undo-icon {
+    font-size: 14px;
+    padding: 4px 8px;
+    color: var(--text-faint);
+  }
+  .energy-op-btn.undo-icon:not(:disabled):hover { color: var(--gold); border-color: var(--gold); }
 
   /* ===== Energy Pools (simplified) ===== */
   .energy-section {
@@ -1594,7 +1592,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.1.4</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.1.5</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -1643,13 +1641,13 @@
 <main>
   <div class="toolbar">
     <h2>账号列表</h2>
-    <label class="simple-mode-toggle">
+    <div class="simple-mode-toggle">
       <input type="checkbox" id="simpleModeToggle" onchange="toggleSimpleMode()" />
-      精简模式
-    </label>
-    <span class="sync-status" id="syncStatus"></span>
+      <span>精简模式</span>
+    </div>
     <div class="toolbar-actions">
       <button class="tool-btn sync" onclick="openSyncModal()">☁ 同步</button>
+      <button class="tool-btn undo" id="globalUndoBtn" onclick="undoAction()" disabled>撤回</button>
       <button class="tool-btn export" onclick="exportData()">导出数据</button>
       <button class="tool-btn import" onclick="document.getElementById('importFile').click()">导入数据</button>
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)" />
@@ -1774,6 +1772,10 @@ const CLASS_ICONS = {
 let DATA = { accounts: [] };
 var undoStack = [];
 var UNDO_MAX = 5;
+var selectedChar = null; // { accId, charId } or null
+var charEnergyUndoStacks = {}; // { "accId-charId": [{white, blue}, ...] }
+var energyCooldownUntil = 0;
+var ENERGY_COOLDOWN_MS = 500;
 let simpleMode = false;
 let sortState = { column: null, direction: null };
 
@@ -1792,12 +1794,101 @@ function pushUndo() {
   if (undoStack.length > UNDO_MAX) undoStack.shift();
 }
 
-function undoAction(accId) {
+function undoAction() {
   if (undoStack.length === 0) return;
   DATA = undoStack.pop();
   saveData();
   render();
   showToast('已撤回（剩余' + undoStack.length + '步）');
+}
+
+function updateGlobalUndoBtn() {
+  var btn = document.getElementById('globalUndoBtn');
+  if (!btn) return;
+  btn.disabled = undoStack.length === 0;
+  btn.textContent = undoStack.length > 0 ? '撤回(' + undoStack.length + ')' : '撤回';
+}
+
+function toggleCharSelection(accId, charId) {
+  if (selectedChar && selectedChar.accId === accId && selectedChar.charId === charId) {
+    selectedChar = null;
+  } else {
+    selectedChar = { accId: accId, charId: charId };
+  }
+  render();
+}
+
+function isCharSelected(accId, charId) {
+  return selectedChar && selectedChar.accId === accId && selectedChar.charId === charId;
+}
+
+function charEnergyKey(accId, charId) { return accId + '-' + charId; }
+
+function isEnergyCooldown() { return Date.now() < energyCooldownUntil; }
+
+function pushCharEnergyUndo(accId, charId, whiteEnergy, blueEnergy) {
+  var key = charEnergyKey(accId, charId);
+  if (!charEnergyUndoStacks[key]) charEnergyUndoStacks[key] = [];
+  charEnergyUndoStacks[key].push({ white: whiteEnergy, blue: blueEnergy });
+  if (charEnergyUndoStacks[key].length > 5) charEnergyUndoStacks[key].shift();
+}
+
+function energyOp(accId, charId, type) {
+  if (isEnergyCooldown()) return;
+  var r = findChar(accId, charId); if (!r) return;
+  var ch = r.ch;
+  var acc = r.acc;
+  var white = Math.floor(calcWhiteEnergy(acc, ch).displayEnergy);
+  var blue = ch.blueEnergy || 0;
+
+  if (type === 'sub120' || type === 'sub80') {
+    var amount = type === 'sub120' ? 120 : 80;
+    if (white + blue < amount) return;
+    pushCharEnergyUndo(accId, charId, white, blue);
+    pushUndo();
+    var fromWhite = Math.min(white, amount);
+    var fromBlue = amount - fromWhite;
+    ch.whiteEnergy = Math.max(0, white - fromWhite);
+    ch.whiteTimestamp = new Date().toISOString();
+    ch.blueEnergy = Math.max(0, blue - fromBlue);
+  } else if (type === 'add40' || type === 'add10') {
+    var addAmount = type === 'add40' ? 40 : 10;
+    if (blue + addAmount > BLUE_CAP) return;
+    pushCharEnergyUndo(accId, charId, white, blue);
+    pushUndo();
+    ch.blueEnergy = blue + addAmount;
+  } else if (type === 'undo') {
+    var key = charEnergyKey(accId, charId);
+    var stack = charEnergyUndoStacks[key];
+    if (!stack || stack.length === 0) return;
+    var prev = stack.pop();
+    pushUndo();
+    ch.whiteEnergy = prev.white;
+    ch.whiteTimestamp = new Date().toISOString();
+    ch.blueEnergy = prev.blue;
+  }
+
+  energyCooldownUntil = Date.now() + ENERGY_COOLDOWN_MS;
+  saveData();
+  render();
+  setTimeout(render, ENERGY_COOLDOWN_MS + 10);
+}
+
+function canEnergySub(acc, ch, amount) {
+  var white = Math.floor(calcWhiteEnergy(acc, ch).displayEnergy);
+  var blue = ch.blueEnergy || 0;
+  return (white + blue) >= amount;
+}
+
+function canEnergyAdd(ch, amount) {
+  var blue = ch.blueEnergy || 0;
+  return (blue + amount) <= BLUE_CAP;
+}
+
+function hasCharEnergyUndo(accId, charId) {
+  var key = charEnergyKey(accId, charId);
+  var stack = charEnergyUndoStacks[key];
+  return stack && stack.length > 0;
 }
 
 // ====== 3小时阶梯计数 ======
@@ -2487,7 +2578,7 @@ function setSort(column) {
 
 // ====== 渲染 ======
 function render() {
-  if (simpleMode) { renderSimpleMode(); updateSummary(); return; }
+  if (simpleMode) { renderSimpleMode(); updateSummary(); updateGlobalUndoBtn(); return; }
   const list = document.getElementById('accountList');
   list.innerHTML = '';
 
@@ -2498,6 +2589,7 @@ function render() {
         <p>还没有账号，点击下方添加开始追踪奥德</p>
       </div>`;
     updateSummary();
+    updateGlobalUndoBtn();
     return;
   }
 
@@ -2542,8 +2634,6 @@ function render() {
               onchange="setMembershipHours('${acc.id}', this.value)" title="会员剩余小时" />
             <span class="mem-time-unit">时</span>
           </div>
-          <button class="acc-save-btn ${undoStack.length > 0 ? 'active' : 'disabled'}" ${undoStack.length > 0 ? '' : 'disabled'}
-            onclick="undoAction('${acc.id}')">撤回${undoStack.length > 0 ? '(' + undoStack.length + ')' : ''}</button>
           <button class="icon-btn danger" onclick="removeAccount('${acc.id}')" title="删除账号">✕</button>
         </div>
       </div>
@@ -2582,11 +2672,28 @@ function render() {
         const todoCountClass = todoCount === 8 ? 'all' : todoCount === 0 ? 'none' : 'partial';
         const blueBd = calcBlueBreakdown(ch);
         const charCard = document.createElement('div');
-        charCard.className = 'char-card' + (ch.charClass ? ' cls-' + ch.charClass : '');
+        charCard.className = 'char-card' + (ch.charClass ? ' cls-' + ch.charClass : '') + (isCharSelected(acc.id, ch.id) ? ' selected' : '');
         charCard.id = `char-${acc.id}-${ch.id}`;
         charCard.ondragover = (e) => onCharDragOver(e, acc.id);
         charCard.ondragleave = onCharDragLeave;
         charCard.ondrop = (e) => onCharDrop(e, acc.id, ch.id);
+        var isSelected = isCharSelected(acc.id, ch.id);
+        var cooldown = isEnergyCooldown();
+        var energyOpsHtml = '';
+        if (isSelected) {
+          var canSub120 = !cooldown && canEnergySub(acc, ch, 120);
+          var canSub80 = !cooldown && canEnergySub(acc, ch, 80);
+          var canAdd40 = !cooldown && canEnergyAdd(ch, 40);
+          var canAdd10 = !cooldown && canEnergyAdd(ch, 10);
+          var canUndoEnergy = !cooldown && hasCharEnergyUndo(acc.id, ch.id);
+          energyOpsHtml = '<div class="energy-ops">' +
+            '<button class="energy-op-btn sub" ' + (canSub120 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub120\')">-120</button>' +
+            '<button class="energy-op-btn sub" ' + (canSub80 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub80\')">-80</button>' +
+            '<button class="energy-op-btn add" ' + (canAdd40 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'add40\')">+40</button>' +
+            '<button class="energy-op-btn add" ' + (canAdd10 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'add10\')">+10</button>' +
+            '<button class="energy-op-btn undo-icon" ' + (canUndoEnergy ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'undo\')" title="撤回能量操作">↩</button>' +
+          '</div>';
+        }
         charCard.innerHTML = `
           <button class="char-delete" onclick="removeCharacter('${acc.id}', '${ch.id}')" title="删除角色">✕</button>
           <div class="char-header">
@@ -2622,6 +2729,7 @@ function render() {
             <span>剩余副本</span>
             <span class="dungeon-count">${dungeonRuns}</span>
             <span class="dungeon-unit">次</span>
+            ${energyOpsHtml}
           </div>
           <div class="energy-section">
             <div class="energy-pool white">
@@ -2707,6 +2815,17 @@ function render() {
             </div>
           </div>
         `;
+        charCard.addEventListener('click', function(e) {
+          var t = e.target;
+          while (t && t !== charCard) {
+            var tag = t.tagName;
+            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'TEXTAREA') return;
+            if (t.classList.contains('todo-item') || t.classList.contains('directive-item')) return;
+            if (t.classList.contains('energy-op-btn')) return;
+            t = t.parentElement;
+          }
+          toggleCharSelection(acc.id, ch.id);
+        });
         const charHeader = charCard.querySelector('.char-header');
         if (charHeader) {
           charHeader.setAttribute('draggable', 'true');
@@ -2724,6 +2843,7 @@ function render() {
   });
 
   updateSummary();
+  updateGlobalUndoBtn();
 }
 
 // 实时更新（不重渲染整页）
@@ -2872,6 +2992,8 @@ function importData(event) {
       obj.accounts.forEach(ensureAccDefaults);
       DATA = obj;
       undoStack = [];
+      charEnergyUndoStacks = {};
+      selectedChar = null;
       saveData();
       render();
       showToast('数据导入成功');
@@ -3183,13 +3305,12 @@ async function hashPassphrase(passphrase) {
 function getSyncPassphrase() { return localStorage.getItem(SYNC_PASSPHRASE_KEY); }
 
 function updateSyncStatus(state) {
-  const el = document.getElementById('syncStatus');
+  var el = document.querySelector('.tool-btn.sync');
   if (!el) return;
-  el.className = 'sync-status ' + state;
-  if (state === 'synced') el.innerHTML = '<span class="sync-dot"></span> 已同步';
-  else if (state === 'syncing') el.innerHTML = '<span class="sync-dot"></span> 同步中...';
-  else if (state === 'error') el.innerHTML = '<span class="sync-dot"></span> 同步失败';
-  else el.innerHTML = '';
+  el.classList.remove('synced', 'syncing', 'error');
+  if (state === 'synced' || state === 'syncing' || state === 'error') {
+    el.classList.add(state);
+  }
 }
 
 function openSyncModal() {
@@ -3323,7 +3444,7 @@ async function manualSyncPull() {
 async function manualSyncPush() {
   closeSyncModal();
   await syncPush();
-  if (document.getElementById('syncStatus').classList.contains('error')) {
+  if (document.querySelector('.tool-btn.sync') && document.querySelector('.tool-btn.sync').classList.contains('error')) {
     showToast('推送失败，请检查网络');
   } else {
     showToast('数据已推送到云端');
@@ -3421,6 +3542,8 @@ async function resolveConflict(choice) {
     DATA = cd;
     DATA._lastModified = _syncCloudCache.modified;
     undoStack = [];
+    charEnergyUndoStacks = {};
+    selectedChar = null;
     localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
     render();
     updateSyncStatus('synced');
