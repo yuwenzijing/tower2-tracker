@@ -309,9 +309,9 @@
   .tool-btn.export:hover { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 2px 12px rgba(34,221,255,0.12); }
   .tool-btn.import:hover { color: var(--gold); border-color: var(--gold); box-shadow: 0 2px 12px rgba(240,204,85,0.12); }
   .tool-btn.sync:hover { color: var(--green); border-color: var(--green); box-shadow: 0 2px 12px rgba(90,232,144,0.12); }
-  .tool-btn.sync.synced { color: var(--green); border-color: rgba(90,232,144,0.3); }
-  .tool-btn.sync.syncing { color: var(--blue); border-color: rgba(90,170,255,0.3); animation: syncPulse 1s infinite; }
-  .tool-btn.sync.error { color: var(--red); border-color: rgba(255,128,128,0.3); }
+  .tool-btn.sync.synced { color: var(--green); border-color: rgba(90,232,144,0.4); background: rgba(90,232,144,0.08); }
+  .tool-btn.sync.syncing { color: var(--blue); border-color: rgba(90,170,255,0.4); background: rgba(90,170,255,0.08); animation: syncPulse 1s infinite; }
+  .tool-btn.sync.error { color: var(--red); border-color: rgba(255,128,128,0.4); background: rgba(255,128,128,0.08); }
   @keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
   .tool-btn.undo { transition: all 0.2s; }
   .tool-btn.undo:not(:disabled):hover { color: var(--gold); border-color: var(--gold); box-shadow: 0 2px 12px rgba(240,204,85,0.12); }
@@ -895,6 +895,7 @@
     color: var(--text-faint);
   }
   .energy-op-btn.undo-icon:not(:disabled):hover { color: var(--gold); border-color: var(--gold); }
+  .energy-op-btn.undo-icon sup { font-size: 9px; margin-left: 1px; font-weight: 700; }
 
   /* ===== Energy Pools (simplified) ===== */
   .energy-section {
@@ -1775,7 +1776,7 @@ var UNDO_MAX = 5;
 var selectedChar = null; // { accId, charId } or null
 var charEnergyUndoStacks = {}; // { "accId-charId": [{white, blue}, ...] }
 var energyCooldownUntil = 0;
-var ENERGY_COOLDOWN_MS = 500;
+var ENERGY_COOLDOWN_MS = 100;
 let simpleMode = false;
 let sortState = { column: null, direction: null };
 
@@ -2691,7 +2692,7 @@ function render() {
             '<button class="energy-op-btn sub" ' + (canSub80 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub80\')">-80</button>' +
             '<button class="energy-op-btn add" ' + (canAdd40 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'add40\')">+40</button>' +
             '<button class="energy-op-btn add" ' + (canAdd10 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'add10\')">+10</button>' +
-            '<button class="energy-op-btn undo-icon" ' + (canUndoEnergy ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'undo\')" title="撤回能量操作">↩</button>' +
+            '<button class="energy-op-btn undo-icon" ' + (canUndoEnergy ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'undo\')" title="撤回能量操作">↩' + (canUndoEnergy ? '<sup>' + charEnergyUndoStacks[charEnergyKey(acc.id, ch.id)].length + '</sup>' : '') + '</button>' +
           '</div>';
         }
         charCard.innerHTML = `
