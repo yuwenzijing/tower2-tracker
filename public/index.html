@@ -2825,7 +2825,6 @@ function render() {
             if (tag === 'INPUT' || tag === 'SELECT' || tag === 'BUTTON' || tag === 'TEXTAREA') return;
             if (t.classList.contains('todo-item') || t.classList.contains('directive-item')) return;
             if (t.classList.contains('energy-op-btn')) return;
-            if (t.classList.contains('energy-section') || t.classList.contains('energy-pool')) return;
             t = t.parentElement;
           }
           toggleCharSelection(acc.id, ch.id);
