@@ -2701,9 +2701,9 @@ function render() {
             <div class="left">
               ${ch.charClass && CLASS_ICONS[ch.charClass] ? `<img class="char-icon-img" src="${CLASS_ICONS[ch.charClass]}" alt="" draggable="false" />` : '<span class="char-icon">👤</span>'}
               <input class="char-name" value="${escapeHtml(ch.name)}" placeholder="输入角色名"
-                size="${Math.max(2, ch.name.length)}"
+                size="${charDisplaySize(ch.name)}"
                 onchange="renameCharacter('${acc.id}', '${ch.id}', this.value)"
-                oninput="this.size=Math.max(2,this.value.length)"
+                oninput="this.size=charDisplaySize(this.value)"
                 ondblclick="this.select()" />
             </div>
             <div class="center">
@@ -3010,6 +3010,12 @@ function importData(event) {
 }
 
 // ====== Utils ======
+function charDisplaySize(str) {
+  var w = 0;
+  for (var i = 0; i < str.length; i++) w += str.charCodeAt(i) > 0x7F ? 2 : 1;
+  return Math.max(4, w);
+}
+
 function escapeHtml(s) {
   const d = document.createElement('div');
   d.textContent = s;
