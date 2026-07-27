@@ -30,6 +30,12 @@
     --glass-border: rgba(255,255,255,0.06);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] { -moz-appearance: textfield; }
   body {
     font-family: "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
     background: var(--bg);
@@ -325,18 +331,20 @@
   .sync-status.syncing .sync-dot { animation: syncPulse 1s infinite; }
   @keyframes syncPulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  .sync-modal-overlay {
+  .modal-overlay {
     position: fixed;
     top: 0; right: 0; bottom: 0; left: 0;
-    background: rgba(0,0,0,0.6);
     display: none;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }
-  .sync-modal-overlay.show { display: flex; }
+  .modal-overlay.show { display: flex; }
+  .sync-modal-overlay {
+    background: rgba(0,0,0,0.6);
+    z-index: 1000;
+  }
   .sync-modal {
     background: var(--bg-card);
     border: 1px solid var(--border-glow);
@@ -565,12 +573,6 @@
     text-align: center;
     outline: none;
     transition: border-bottom-color 0.2s, color 0.2s;
-    -moz-appearance: textfield;
-  }
-  .mem-time-input::-webkit-inner-spin-button,
-  .mem-time-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
   }
   .mem-time-input::placeholder { color: var(--text-faint); font-weight: 400; font-size: 10px; }
   .mem-time-input:focus { border-bottom-color: var(--blue); }
@@ -862,15 +864,9 @@
     text-align: center;
     outline: none;
     transition: border-bottom-color 0.2s, color 0.2s;
-    -moz-appearance: textfield;
     flex-shrink: 0;
   }
   .stat-group .stat-input { text-align: right; }
-  .stat-input::-webkit-inner-spin-button,
-  .stat-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
   .stat-input::placeholder { color: var(--text-faint); font-weight: 400; font-size: 10px; }
   .stat-input:focus { border-bottom-color: var(--gold); }
   .stat-suffix {
@@ -963,14 +959,8 @@
     text-align: center;
     outline: none;
     transition: border-bottom-color 0.2s;
-    -moz-appearance: textfield;
   }
   .energy-input-simple:focus { border-bottom-color: var(--gold); }
-  .energy-input-simple::-webkit-inner-spin-button,
-  .energy-input-simple::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
 
   /* Backpack aode */
   .backpack-aode {
@@ -999,14 +989,8 @@
     text-align: center;
     outline: none;
     transition: border-bottom-color 0.2s;
-    -moz-appearance: textfield;
   }
   .backpack-input:focus { border-bottom-color: var(--gold); }
-  .backpack-input::-webkit-inner-spin-button,
-  .backpack-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
   .backpack-input::placeholder { color: var(--text-faint); font-weight: 400; font-size: 10px; }
   .backpack-energy-hint {
     font-size: 10px;
@@ -1152,14 +1136,8 @@
     text-align: left;
     outline: none;
     transition: border-bottom-color 0.2s;
-    -moz-appearance: textfield;
   }
   .trial-lv-input:focus { border-bottom-color: var(--gold); }
-  .trial-lv-input::-webkit-inner-spin-button,
-  .trial-lv-input::-webkit-outer-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
 
   /* ===== Add Character Button ===== */
   .add-char-btn {
@@ -1309,17 +1287,9 @@
 
   /* ===== 会员到期提醒弹窗 ===== */
   .mem-alert-overlay {
-    position: fixed;
-    top: 0; right: 0; bottom: 0; left: 0;
     background: rgba(0,0,0,0.5);
     z-index: 300;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
   }
-  .mem-alert-overlay.show { display: flex; }
   .mem-alert-box {
     background: #ffffff;
     border: 1px solid rgba(230,57,70,0.4);
@@ -1413,18 +1383,10 @@
 
   /* ===== 基纳统计弹窗 ===== */
   .kina-modal-overlay {
-    position: fixed;
-    top: 0; right: 0; bottom: 0; left: 0;
     background: rgba(0,0,0,0.5);
     z-index: 310;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
     -webkit-overflow-scrolling: touch;
   }
-  .kina-modal-overlay.show { display: flex; }
   .kina-modal-box {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -1551,17 +1513,9 @@
 
   /* ===== 基纳未保存提示弹窗 ===== */
   .kina-confirm-overlay {
-    position: fixed;
-    top: 0; right: 0; bottom: 0; left: 0;
     background: rgba(0,0,0,0.5);
     z-index: 320;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
   }
-  .kina-confirm-overlay.show { display: flex; }
   .kina-confirm-box {
     background: var(--bg-card);
     border: 1px solid var(--border);
@@ -1640,7 +1594,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.1.3</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.1.4</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -1717,12 +1671,12 @@
 <div class="toast" id="toast"></div>
 
 <!-- 同步设置弹窗 -->
-<div class="sync-modal-overlay" id="syncModalOverlay">
+<div class="sync-modal-overlay modal-overlay" id="syncModalOverlay">
   <div class="sync-modal" id="syncModalContent"></div>
 </div>
 
 <!-- 会员到期提醒弹窗 -->
-<div class="mem-alert-overlay" id="memAlertOverlay">
+<div class="mem-alert-overlay modal-overlay" id="memAlertOverlay">
   <div class="mem-alert-box">
     <button class="mem-alert-close-x" onclick="closeMemAlert()" title="关闭">×</button>
     <div class="mem-alert-title">会员即将到期提醒</div>
@@ -1732,7 +1686,7 @@
 </div>
 
 <!-- 基纳统计弹窗 -->
-<div class="kina-modal-overlay" id="kinaModalOverlay">
+<div class="kina-modal-overlay modal-overlay" id="kinaModalOverlay">
   <div class="kina-modal-box">
     <div class="kina-modal-head">
       <div class="kina-modal-title">基纳统计</div>
@@ -1764,7 +1718,7 @@
 </div>
 
 <!-- 基纳未保存提示弹窗 -->
-<div class="kina-confirm-overlay" id="kinaConfirmOverlay">
+<div class="kina-confirm-overlay modal-overlay" id="kinaConfirmOverlay">
   <div class="kina-confirm-box">
     <div class="kina-confirm-msg">修改信息未保存</div>
     <div class="kina-confirm-actions">
@@ -1818,23 +1772,32 @@ const CLASS_ICONS = {
 
 // ====== 全局状态 ======
 let DATA = { accounts: [] };
-let dirtyChars = new Set();
-let dirtyAccounts = new Set();
+var undoStack = [];
+var UNDO_MAX = 5;
 let simpleMode = false;
 let sortState = { column: null, direction: null };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
-function charKey(accId, charId) { return `${accId}/${charId}`; }
+function findChar(accId, charId) {
+  var acc = DATA.accounts.find(function(a) { return a.id === accId; });
+  if (!acc) return null;
+  var ch = acc.characters.find(function(c) { return c.id === charId; });
+  if (!ch) return null;
+  return { acc: acc, ch: ch };
+}
 
-function markDirty(accId, charId) { dirtyChars.add(charKey(accId, charId)); }
-function isDirty(accId, charId) { return dirtyChars.has(charKey(accId, charId)); }
-function markAccountDirty(accId) { dirtyAccounts.add(accId); }
-function isAccountDirty(accId) {
-  if (dirtyAccounts.has(accId)) return true;
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return false;
-  return acc.characters.some(ch => isDirty(accId, ch.id));
+function pushUndo() {
+  undoStack.push(JSON.parse(JSON.stringify(DATA)));
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+}
+
+function undoAction(accId) {
+  if (undoStack.length === 0) return;
+  DATA = undoStack.pop();
+  saveData();
+  render();
+  showToast('已撤回（剩余' + undoStack.length + '步）');
 }
 
 // ====== 3小时阶梯计数 ======
@@ -2029,11 +1992,11 @@ function isWhiteCapToday(acc, ch) {
 }
 
 // ====== 待办事项：重置时间计算 ======
-function getAwakeningResetPoint() {
-  const now = new Date();
-  const day = now.getDay();
-  let daysBack = (day - 3 + 7) % 7;
-  const reset = new Date(now);
+function getWeeklyResetPoint() {
+  var now = new Date();
+  var day = now.getDay();
+  var daysBack = (day - 3 + 7) % 7;
+  var reset = new Date(now);
   reset.setDate(now.getDate() - daysBack);
   reset.setHours(3, 0, 0, 0);
   if (reset > now) reset.setDate(reset.getDate() - 7);
@@ -2052,65 +2015,38 @@ function getAbyssResetPoint() {
   });
   return new Date(Math.max(candidates[0].getTime(), candidates[1].getTime()));
 }
-function isAwakeningDone(ch) {
-  if (!ch.awakeningDone) return false;
-  return new Date(ch.awakeningDone) > getAwakeningResetPoint();
+
+var TODO_CONFIG = {
+  awakening:  { field: 'awakeningDone',  resetFn: getWeeklyResetPoint },
+  abyss:      { field: 'abyssDone',      resetFn: getAbyssResetPoint },
+  sanctuary1: { field: 'sanctuary1Done', resetFn: getWeeklyResetPoint },
+  sanctuary2: { field: 'sanctuary2Done', resetFn: getWeeklyResetPoint },
+  sanctuary3: { field: 'sanctuary3Done', resetFn: getWeeklyResetPoint },
+  shop:       { field: 'shopDone',       resetFn: getWeeklyResetPoint },
+  transform:  { field: 'transformDone',  resetFn: getWeeklyResetPoint },
+  trial:      { field: 'trialDone',      resetFn: getWeeklyResetPoint },
+};
+
+function isTodoDone(ch, key) {
+  var cfg = TODO_CONFIG[key];
+  if (!cfg || !ch[cfg.field]) return false;
+  return new Date(ch[cfg.field]) > cfg.resetFn();
 }
-function isAbyssDone(ch) {
-  if (!ch.abyssDone) return false;
-  return new Date(ch.abyssDone) > getAbyssResetPoint();
+
+function toggleTodo(accId, charId, key) {
+  var r = findChar(accId, charId); if (!r) return;
+  var cfg = TODO_CONFIG[key]; if (!cfg) return;
+  pushUndo();
+  r.ch[cfg.field] = isTodoDone(r.ch, key) ? null : new Date().toISOString();
+  saveData(); render();
 }
-function getSanctuaryResetPoint() {
-  const now = new Date();
-  const day = now.getDay();
-  let daysBack = (day - 3 + 7) % 7;
-  const reset = new Date(now);
-  reset.setDate(now.getDate() - daysBack);
-  reset.setHours(3, 0, 0, 0);
-  if (reset > now) reset.setDate(reset.getDate() - 7);
-  return reset;
-}
-function isSanctuary1Done(ch) {
-  if (!ch.sanctuary1Done) return false;
-  return new Date(ch.sanctuary1Done) > getSanctuaryResetPoint();
-}
-function isSanctuary2Done(ch) {
-  if (!ch.sanctuary2Done) return false;
-  return new Date(ch.sanctuary2Done) > getSanctuaryResetPoint();
-}
-function isSanctuary3Done(ch) {
-  if (!ch.sanctuary3Done) return false;
-  return new Date(ch.sanctuary3Done) > getSanctuaryResetPoint();
-}
-function isShopDone(ch) {
-  if (!ch.shopDone) return false;
-  return new Date(ch.shopDone) > getSanctuaryResetPoint();
-}
-function isTransformDone(ch) {
-  if (!ch.transformDone) return false;
-  return new Date(ch.transformDone) > getSanctuaryResetPoint();
-}
-function isTrialDone(ch) {
-  // 试炼完成 = 手动勾选(时间戳)，刷新点为周三3:00(与卢德莱/圣所一致)；LV不参与完成判定
-  if (!ch.trialDone) return false;
-  return new Date(ch.trialDone) > getSanctuaryResetPoint();
-}
-function toggleTrial(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.trialDone = isTrialDone(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
+
 function setTrialLv(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  const n = parseInt(val);
-  ch.trialLv = (isNaN(n) || n <= 0) ? 0 : Math.min(n, 16);
-  markDirty(accId, charId); render();
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  var n = parseInt(val);
+  r.ch.trialLv = (isNaN(n) || n <= 0) ? 0 : Math.min(n, 16);
+  saveData(); render();
 }
 
 // ====== 指令书（账号维度待办，周三3:00重置） ======
@@ -2123,74 +2059,16 @@ var DIRECTIVE_ITEMS = [
 
 function isDirectiveDone(acc, key) {
   if (!acc.directives || !acc.directives[key]) return false;
-  return new Date(acc.directives[key]) > getSanctuaryResetPoint();
+  return new Date(acc.directives[key]) > getWeeklyResetPoint();
 }
 
 function toggleDirective(accId, key) {
   var acc = DATA.accounts.find(function(a) { return a.id === accId; });
   if (!acc) return;
   if (!acc.directives) acc.directives = {};
+  pushUndo();
   acc.directives[key] = isDirectiveDone(acc, key) ? null : new Date().toISOString();
-  markAccountDirty(accId);
-  render();
-}
-
-// 待办切换
-function toggleAwakening(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.awakeningDone = isAwakeningDone(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
-function toggleAbyss(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.abyssDone = isAbyssDone(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
-function toggleSanctuary1(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.sanctuary1Done = isSanctuary1Done(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
-function toggleSanctuary2(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.sanctuary2Done = isSanctuary2Done(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
-function toggleSanctuary3(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.sanctuary3Done = isSanctuary3Done(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
-function toggleShop(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.shopDone = isShopDone(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
-}
-function toggleTransform(accId, charId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  ch.transformDone = isTransformDone(ch) ? null : new Date().toISOString();
-  markDirty(accId, charId); render();
+  saveData(); render();
 }
 
 // ====== 会员剩余时间 ======
@@ -2210,6 +2088,7 @@ function calcMembershipRemaining(acc) {
 function setMembershipDays(accId, val) {
   const acc = DATA.accounts.find(a => a.id === accId);
   if (!acc) return;
+  pushUndo();
   const n = parseInt(val);
   const remaining = calcMembershipRemaining(acc);
   acc.membershipDays = (isNaN(n) || n < 0) ? null : n;
@@ -2223,6 +2102,7 @@ function setMembershipDays(accId, val) {
 function setMembershipHours(accId, val) {
   const acc = DATA.accounts.find(a => a.id === accId);
   if (!acc) return;
+  pushUndo();
   const n = parseInt(val);
   const remaining = calcMembershipRemaining(acc);
   acc.membershipHours = (isNaN(n) || n < 0) ? null : Math.min(n, 24);
@@ -2296,6 +2176,7 @@ function addAccount() {
     membershipSetAt: null,
     characters: []
   };
+  pushUndo();
   DATA.accounts.push(acc);
   addCharacter(acc.id, false);
   saveData(); render();
@@ -2305,7 +2186,7 @@ function removeAccount(id) {
   const acc = DATA.accounts.find(a => a.id === id);
   if (!acc) return;
   if (confirm(`确定删除账号「${acc.name}」及其所有角色？此操作不可撤销。`)) {
-    acc.characters.forEach(ch => dirtyChars.delete(charKey(id, ch.id)));
+    pushUndo();
     DATA.accounts = DATA.accounts.filter(a => a.id !== id);
     saveData(); render();
     showToast('已删除账号');
@@ -2313,11 +2194,12 @@ function removeAccount(id) {
 }
 function renameAccount(id, name) {
   const acc = DATA.accounts.find(a => a.id === id);
-  if (acc) { acc.name = name || acc.name; saveData(); }
+  if (acc) { pushUndo(); acc.name = name || acc.name; saveData(); }
 }
 function setMembership(id, membershipKey) {
   const acc = DATA.accounts.find(a => a.id === id);
   if (!acc) return;
+  pushUndo();
   acc.membership = membershipKey;
   saveData(); render();
   // 用户主动切换会员类型 → 清除12小时限制并立即检查弹窗
@@ -2325,23 +2207,14 @@ function setMembership(id, membershipKey) {
   checkMembershipAlert();
 }
 
-// 账号级别保存
-function saveAccount(accId) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  if (!isAccountDirty(accId)) return;
-  saveData();
-  acc.characters.forEach(ch => dirtyChars.delete(charKey(accId, ch.id)));
-  dirtyAccounts.delete(accId);
-  render();
-  showToast('账号数据已保存');
-}
+
 
 // ====== 角色CRUD ======
 function addCharacter(accId, withRender = true) {
   const acc = DATA.accounts.find(a => a.id === accId);
   if (!acc) return;
   const num = (acc.characters.length || 0) + 1;
+  pushUndo();
   acc.characters.push({
     id: uid(),
     name: `角色${num}`,
@@ -2374,80 +2247,68 @@ function removeCharacter(accId, charId) {
   const ch = acc.characters.find(c => c.id === charId);
   if (!ch) return;
   if (confirm(`确定删除角色「${ch.name}」？`)) {
-    dirtyChars.delete(charKey(accId, charId));
+    pushUndo();
     acc.characters = acc.characters.filter(c => c.id !== charId);
     saveData(); render();
     showToast('已删除角色');
   }
 }
 function renameCharacter(accId, charId, name) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (ch) { ch.name = name || ch.name; markDirty(accId, charId); }
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  r.ch.name = name || r.ch.name;
+  saveData(); render();
 }
 function setCharacterClass(accId, charId, classKey) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (ch) { ch.charClass = classKey; markDirty(accId, charId); render(); }
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  r.ch.charClass = classKey;
+  saveData(); render();
 }
 function setItemLevel(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  const n = parseInt(val);
-  ch.itemLevel = (isNaN(n) || n <= 0) ? null : Math.min(n, 6500);
-  markDirty(accId, charId); render();
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  var n = parseInt(val);
+  r.ch.itemLevel = (isNaN(n) || n <= 0) ? null : Math.min(n, 6500);
+  saveData(); render();
 }
 function setCombatPower(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  const n = parseFloat(val);
-  ch.combatPower = (isNaN(n) || n <= 0) ? null : Math.min(Math.round(n * 10) / 10, 1000);
-  markDirty(accId, charId); render();
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  var n = parseFloat(val);
+  r.ch.combatPower = (isNaN(n) || n <= 0) ? null : Math.min(Math.round(n * 10) / 10, 1000);
+  saveData(); render();
 }
 
 // 能量填写（clamp到上限）
 function setWhiteEnergy(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
   val = Math.max(0, Math.min(WHITE_CAP, parseInt(val) || 0));
-  ch.whiteEnergy = val;
-  ch.whiteTimestamp = new Date().toISOString();
-  markDirty(accId, charId); render();
+  r.ch.whiteEnergy = val;
+  r.ch.whiteTimestamp = new Date().toISOString();
+  saveData(); render();
 }
 function setBlueEnergy(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
   val = Math.max(0, Math.min(BLUE_CAP, parseInt(val) || 0));
-  ch.blueEnergy = val;
-  markDirty(accId, charId); render();
+  r.ch.blueEnergy = val;
+  saveData(); render();
 }
 function setBackpackLarge(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  const n = parseInt(val);
-  ch.blueBackpackLarge = (isNaN(n) || n < 0) ? null : Math.min(n, 999);
-  markDirty(accId, charId); render();
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  var n = parseInt(val);
+  r.ch.blueBackpackLarge = (isNaN(n) || n < 0) ? null : Math.min(n, 999);
+  saveData(); render();
 }
 function setBackpackSmall(accId, charId, val) {
-  const acc = DATA.accounts.find(a => a.id === accId);
-  if (!acc) return;
-  const ch = acc.characters.find(c => c.id === charId);
-  if (!ch) return;
-  const n = parseInt(val);
-  ch.blueBackpackSmall = (isNaN(n) || n < 0) ? null : Math.min(n, 999);
-  markDirty(accId, charId); render();
+  var r = findChar(accId, charId); if (!r) return;
+  pushUndo();
+  var n = parseInt(val);
+  r.ch.blueBackpackSmall = (isNaN(n) || n < 0) ? null : Math.min(n, 999);
+  saveData(); render();
 }
 
 // 三档纯色
@@ -2505,6 +2366,7 @@ function onCharDrop(e, accId, targetCharId) {
   const fromIdx = acc.characters.findIndex(c => c.id === dragData.charId);
   const toIdx = acc.characters.findIndex(c => c.id === targetCharId);
   if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+  pushUndo();
   const [moved] = acc.characters.splice(fromIdx, 1);
   acc.characters.splice(toIdx, 0, moved);
   saveData(); render();
@@ -2530,10 +2392,9 @@ function toggleSimpleMode() {
 
 function getTodoCount(ch) {
   return [
-    isSanctuary1Done(ch), isSanctuary2Done(ch), isSanctuary3Done(ch),
-    isAwakeningDone(ch), isAbyssDone(ch), isShopDone(ch), isTransformDone(ch),
-    isTrialDone(ch)
-  ].filter(Boolean).length;
+    'sanctuary1', 'sanctuary2', 'sanctuary3',
+    'awakening', 'abyss', 'shop', 'transform', 'trial'
+  ].filter(function(key) { return isTodoDone(ch, key); }).length;
 }
 
 function renderSimpleMode() {
@@ -2650,8 +2511,6 @@ function render() {
     const memUrgent = (memDays !== null || memHours !== null) && (memDays || 0) <= 1;
     const accAode = calcAccountRemainingAode(acc);
     const accDungeon = calcAccountDungeonRuns(acc);
-    const accDirty = isAccountDirty(acc.id);
-
     card.innerHTML = `
       <div class="account-header">
         <div class="acc-left">
@@ -2683,8 +2542,8 @@ function render() {
               onchange="setMembershipHours('${acc.id}', this.value)" title="会员剩余小时" />
             <span class="mem-time-unit">时</span>
           </div>
-          <button class="acc-save-btn ${accDirty?'active':'disabled'}" ${accDirty?'':'disabled'}
-            onclick="saveAccount('${acc.id}')">保存</button>
+          <button class="acc-save-btn ${undoStack.length > 0 ? 'active' : 'disabled'}" ${undoStack.length > 0 ? '' : 'disabled'}
+            onclick="undoAction('${acc.id}')">撤回${undoStack.length > 0 ? '(' + undoStack.length + ')' : ''}</button>
           <button class="icon-btn danger" onclick="removeAccount('${acc.id}')" title="删除账号">✕</button>
         </div>
       </div>
@@ -2711,14 +2570,14 @@ function render() {
       acc.characters.forEach((ch) => {
         const energy = calcWhiteEnergy(acc, ch);
         const dungeonRuns = calcDungeonRuns(acc, ch);
-        const awDone = isAwakeningDone(ch);
-        const abDone = isAbyssDone(ch);
-        const s1Done = isSanctuary1Done(ch);
-        const s2Done = isSanctuary2Done(ch);
-        const s3Done = isSanctuary3Done(ch);
-        const shopDone = isShopDone(ch);
-        const tfDone = isTransformDone(ch);
-        const trialDone = isTrialDone(ch);
+        const awDone = isTodoDone(ch, 'awakening');
+        const abDone = isTodoDone(ch, 'abyss');
+        const s1Done = isTodoDone(ch, 'sanctuary1');
+        const s2Done = isTodoDone(ch, 'sanctuary2');
+        const s3Done = isTodoDone(ch, 'sanctuary3');
+        const shopDone = isTodoDone(ch, 'shop');
+        const tfDone = isTodoDone(ch, 'transform');
+        const trialDone = isTodoDone(ch, 'trial');
         const todoCount = [s1Done, s2Done, s3Done, awDone, abDone, shopDone, tfDone, trialDone].filter(Boolean).length;
         const todoCountClass = todoCount === 8 ? 'all' : todoCount === 0 ? 'none' : 'partial';
         const blueBd = calcBlueBreakdown(ch);
@@ -2798,42 +2657,42 @@ function render() {
             每周待办 <span class="todo-count ${todoCountClass}">（${todoCount}/8）</span>
           </div>
           <div class="todo-section sanctuary-row">
-            <div class="todo-item ${s1Done?'done':''}" data-todo="sanctuary1" onclick="toggleSanctuary1('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item ${s1Done?'done':''}" data-todo="sanctuary1" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary1')" title="点击切换完成状态">
               <div class="todo-checkbox">${s1Done?'✓':''}</div>
               <span class="todo-label">卢德莱</span>
             </div>
-            <div class="todo-item ${s2Done?'done':''}" data-todo="sanctuary2" onclick="toggleSanctuary2('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item ${s2Done?'done':''}" data-todo="sanctuary2" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary2')" title="点击切换完成状态">
               <div class="todo-checkbox">${s2Done?'✓':''}</div>
               <span class="todo-label">侵蚀净化所</span>
             </div>
-            <div class="todo-item ${s3Done?'done':''}" data-todo="sanctuary3" onclick="toggleSanctuary3('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item ${s3Done?'done':''}" data-todo="sanctuary3" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary3')" title="点击切换完成状态">
               <div class="todo-checkbox">${s3Done?'✓':''}</div>
               <span class="todo-label">穆斯费尔圣杯</span>
             </div>
           </div>
           <div class="todo-section">
-            <div class="todo-item ${awDone?'done':''}" data-todo="awakening" onclick="toggleAwakening('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item ${awDone?'done':''}" data-todo="awakening" onclick="toggleTodo('${acc.id}','${ch.id}','awakening')" title="点击切换完成状态">
               <div class="todo-checkbox">${awDone?'✓':''}</div>
               <span class="todo-label">觉醒战</span>
             </div>
-            <div class="todo-item ${shopDone?'done':''}" data-todo="shop" onclick="toggleShop('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item ${shopDone?'done':''}" data-todo="shop" onclick="toggleTodo('${acc.id}','${ch.id}','shop')" title="点击切换完成状态">
               <div class="todo-checkbox">${shopDone?'✓':''}</div>
               <span class="todo-label">商店奥德</span>
             </div>
-            <div class="todo-item ${tfDone?'done':''}" data-todo="transform" onclick="toggleTransform('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item ${tfDone?'done':''}" data-todo="transform" onclick="toggleTodo('${acc.id}','${ch.id}','transform')" title="点击切换完成状态">
               <div class="todo-checkbox">${tfDone?'✓':''}</div>
               <span class="todo-label">变换奥德</span>
             </div>
           </div>
           <div class="todo-section">
-            <div class="todo-item abyss-span ${abDone?'done':''}" data-todo="abyss" onclick="toggleAbyss('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item abyss-span ${abDone?'done':''}" data-todo="abyss" onclick="toggleTodo('${acc.id}','${ch.id}','abyss')" title="点击切换完成状态">
               <div class="abyss-left">
                 <div class="todo-checkbox">${abDone?'✓':''}</div>
                 <span class="todo-label">深渊回廊</span>
               </div>
               <span class="todo-reset">周三22:00/周六22:00</span>
             </div>
-            <div class="todo-item trial-item ${trialDone?'done':''}" data-todo="trial" onclick="toggleTrial('${acc.id}','${ch.id}')" title="点击切换完成状态">
+            <div class="todo-item trial-item ${trialDone?'done':''}" data-todo="trial" onclick="toggleTodo('${acc.id}','${ch.id}','trial')" title="点击切换完成状态">
               <div class="trial-left">
                 <div class="todo-checkbox">${trialDone?'✓':''}</div>
                 <span class="todo-label">试炼</span>
@@ -2878,20 +2737,10 @@ function updateRecoveryDisplay() {
     acc.characters.forEach(ch => {
       const charCard = document.getElementById(`char-${acc.id}-${ch.id}`);
       if (!charCard) return;
-      const todoChecks = {
-        'awakening': isAwakeningDone,
-        'abyss': isAbyssDone,
-        'sanctuary1': isSanctuary1Done,
-        'sanctuary2': isSanctuary2Done,
-        'sanctuary3': isSanctuary3Done,
-        'shop': isShopDone,
-        'transform': isTransformDone,
-        'trial': isTrialDone,
-      };
       const todoItems = charCard.querySelectorAll('.todo-item[data-todo]');
       todoItems.forEach(item => {
-        const fn = todoChecks[item.dataset.todo];
-        if (fn && item.classList.contains('done') !== fn(ch)) todoChanged = true;
+        const key = item.dataset.todo;
+        if (key && item.classList.contains('done') !== isTodoDone(ch, key)) todoChanged = true;
       });
     });
   });
@@ -3022,8 +2871,7 @@ function importData(event) {
       }
       obj.accounts.forEach(ensureAccDefaults);
       DATA = obj;
-      dirtyChars.clear();
-      dirtyAccounts.clear();
+      undoStack = [];
       saveData();
       render();
       showToast('数据导入成功');
@@ -3572,8 +3420,7 @@ async function resolveConflict(choice) {
     if (cd.accounts) cd.accounts.forEach(ensureAccDefaults);
     DATA = cd;
     DATA._lastModified = _syncCloudCache.modified;
-    dirtyChars.clear();
-    dirtyAccounts.clear();
+    undoStack = [];
     localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
     render();
     updateSyncStatus('synced');

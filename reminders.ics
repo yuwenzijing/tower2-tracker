@@ -1,0 +1,91 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Tower2Tracker//Reminders//CN
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+X-WR-CALNAME:Tower2 运维提醒
+X-WR-TIMEZONE:Asia/Shanghai
+
+BEGIN:VTIMEZONE
+TZID:Asia/Shanghai
+BEGIN:STANDARD
+DTSTART:19700101T000000
+TZOFFSETFROM:+0800
+TZOFFSETTO:+0800
+TZNAME:CST
+END:STANDARD
+END:VTIMEZONE
+
+BEGIN:VEVENT
+UID:github-token-20261020@tower2-tracker
+DTSTART;TZID=Asia/Shanghai:20261020T090000
+DTEND;TZID=Asia/Shanghai:20261020T093000
+SUMMARY:⚠️ GitHub Token 到期 - 立即续期
+DESCRIPTION:GitHub Personal Access Token (PAT) 今天到期！\n\n操作步骤：\n1. 访问 https://github.com/settings/tokens\n2. 找到 tower2-tracker 使用的 Token\n3. 点击 Regenerate token，有效期选 90 天\n4. 复制新 Token 更新到本地 git 配置\n5. 在日历中更新下次到期提醒日期（+90天）\n\n⚠️ 续期后记得更新下一次提醒时间！
+RRULE:FREQ=DAILY;INTERVAL=90
+BEGIN:VALARM
+TRIGGER:-P7D
+ACTION:DISPLAY
+DESCRIPTION:GitHub Token 将在 7 天后到期，请准备续期
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P3D
+ACTION:DISPLAY
+DESCRIPTION:GitHub Token 将在 3 天后到期，请尽快续期
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P1D
+ACTION:DISPLAY
+DESCRIPTION:GitHub Token 明天到期！请立即续期
+END:VALARM
+END:VEVENT
+
+BEGIN:VEVENT
+UID:domain-buyali-20270724@tower2-tracker
+DTSTART;TZID=Asia/Shanghai:20270724T080000
+DTEND;TZID=Asia/Shanghai:20270724T083000
+SUMMARY:⚠️ 域名 buyali.xyz 到期 - 立即续费
+DESCRIPTION:域名 buyali.xyz 将于 2027-07-24 07:59:59 到期！\n\n操作步骤：\n1. 登录域名注册商控制台\n2. 找到 buyali.xyz 域名\n3. 点击续费，续期 1 年\n4. 确认付款并验证续费成功\n5. 在日历中更新下次到期提醒日期（+1年）\n\n⚠️ 域名过期后可能被他人抢注，务必提前续费！
+RRULE:FREQ=YEARLY;INTERVAL=1
+BEGIN:VALARM
+TRIGGER:-P7D
+ACTION:DISPLAY
+DESCRIPTION:域名 buyali.xyz 将在 7 天后到期，请准备续费
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P3D
+ACTION:DISPLAY
+DESCRIPTION:域名 buyali.xyz 将在 3 天后到期，请尽快续费
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P1D
+ACTION:DISPLAY
+DESCRIPTION:域名 buyali.xyz 明天到期！请立即续费
+END:VALARM
+END:VEVENT
+
+BEGIN:VEVENT
+UID:giffgaff-baohao-20270108@tower2-tracker
+DTSTART;TZID=Asia/Shanghai:20270108T100000
+DTEND;TZID=Asia/Shanghai:20270108T103000
+SUMMARY:⚠️ Giffgaff 保号 - 立即操作
+DESCRIPTION:Giffgaff SIM 卡距上次活动已满 170 天，即将因不活跃被回收！\n\n保号操作（任选其一）：\n- 发送一条短信\n- 拨打一个电话\n- 使用少量流量\n- 充值任意金额\n\n完成后在日历中确认，下次提醒将自动在 170 天后触发。\n\n⚠️ 超过 180 天未使用将被永久停号！当前距 180 天硬限仅剩 10 天缓冲！
+RRULE:FREQ=DAILY;INTERVAL=170
+BEGIN:VALARM
+TRIGGER:-P7D
+ACTION:DISPLAY
+DESCRIPTION:Giffgaff 保号将在 7 天后到期，请准备操作
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P3D
+ACTION:DISPLAY
+DESCRIPTION:Giffgaff 保号将在 3 天后到期，请尽快操作
+END:VALARM
+BEGIN:VALARM
+TRIGGER:-P1D
+ACTION:DISPLAY
+DESCRIPTION:Giffgaff 保号明天到期！请立即操作
+END:VALARM
+END:VEVENT
+
+END:VCALENDAR
