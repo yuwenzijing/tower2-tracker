@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "canvas": "^3.2.3",
+    "tesseract.js": "^7.0.0"
+  }
+}

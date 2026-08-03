@@ -2687,12 +2687,15 @@ function jumpToChar(accId, charId) {
 
 // ====== 精简模式 ======
 function toggleSimpleMode() {
-  var scrollY = window.scrollY;
+  var el = document.documentElement;
+  var scrollY = el.scrollTop || window.scrollY;
+  el.style.overflow = 'hidden';
   simpleMode = document.getElementById('simpleModeToggle').checked;
   document.getElementById('defaultView').style.display = simpleMode ? 'none' : '';
   document.getElementById('simpleView').style.display = simpleMode ? '' : 'none';
   if (simpleMode) renderSimpleMode();
-  requestAnimationFrame(function() { window.scrollTo(0, scrollY); });
+  el.scrollTop = scrollY;
+  setTimeout(function() { el.style.overflow = ''; el.scrollTop = scrollY; }, 50);
 }
 
 function toggleDungeonCost() {
@@ -4001,7 +4004,7 @@ async function processOcrImage(imageDataUrl) {
     raw.getContext('2d').drawImage(img, 0, 0);
     var processed = ocrPreprocess(raw);
     var url = processed.toDataURL('image/png');
-    var result = await Tesseract.recognize(url, 'eng+chi_sim', { logger: function() {} });
+    var result = await Tesseract.recognize(url, 'eng', { logger: function() {} });
     var text = result.data.text || '';
     console.log('[OCR raw text]', text);
     var parsed = parseOcrText(text);
@@ -4053,10 +4056,14 @@ function parseOcrText(text) {
     result.blueEnergy = parseInt(audeMatch[2].replace(/,/g, ''), 10);
   }
   var bigNums = cleaned.match(/\d{1,3}(?:,\d{3}){2,}/g);
-  if (bigNums) {
+  if (!bigNums) bigNums = [];
+  var rawBigNums = cleaned.match(/\d{7,}/g);
+  if (rawBigNums) bigNums = bigNums.concat(rawBigNums);
+  if (bigNums.length > 0) {
     var kinahs = bigNums.map(function(k) { return parseInt(k.replace(/,/g, ''), 10); });
+    kinahs = kinahs.filter(function(n) { return n >= 1000000; });
     kinahs.sort(function(a, b) { return b - a; });
-    result.kina = kinahs[0];
+    if (kinahs.length > 0) result.kina = kinahs[0];
   }
   var cpMatch = cleaned.match(/(\d[\d,.]*)\s*[Kk]/);
   if (cpMatch) {
