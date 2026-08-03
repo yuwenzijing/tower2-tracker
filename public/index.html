@@ -2687,10 +2687,12 @@ function jumpToChar(accId, charId) {
 
 // ====== 精简模式 ======
 function toggleSimpleMode() {
+  var scrollY = window.scrollY;
   simpleMode = document.getElementById('simpleModeToggle').checked;
   document.getElementById('defaultView').style.display = simpleMode ? 'none' : '';
   document.getElementById('simpleView').style.display = simpleMode ? '' : 'none';
   if (simpleMode) renderSimpleMode();
+  requestAnimationFrame(function() { window.scrollTo(0, scrollY); });
 }
 
 function toggleDungeonCost() {
@@ -3978,24 +3980,9 @@ function ocrReselect() {
 
 function ocrPreprocess(srcCanvas) {
   var W = srcCanvas.width, H = srcCanvas.height;
-  var scale = 2;
-  var outW = Math.round(W * scale), outH = Math.round(H * scale);
-  if (outW > 4000) { scale = 4000 / W; outW = Math.round(W * scale); outH = Math.round(H * scale); }
   var canvas = document.createElement('canvas');
-  canvas.width = outW; canvas.height = outH;
-  var ctx = canvas.getContext('2d');
-  ctx.drawImage(srcCanvas, 0, 0, outW, outH);
-  var imgData = ctx.getImageData(0, 0, outW, outH);
-  var d = imgData.data;
-  for (var i = 0; i < d.length; i += 4) {
-    var r = d[i], g = d[i+1], b = d[i+2];
-    var lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    var isGold = (r > 140 && g > 100 && b < 120 && r > b);
-    var isBright = lum > 120 || Math.max(r, g, b) > 160;
-    var v = (isBright || isGold) ? 0 : 255;
-    d[i] = d[i+1] = d[i+2] = v;
-  }
-  ctx.putImageData(imgData, 0, 0);
+  canvas.width = W; canvas.height = H;
+  canvas.getContext('2d').drawImage(srcCanvas, 0, 0);
   return canvas;
 }
 
@@ -4014,9 +4001,11 @@ async function processOcrImage(imageDataUrl) {
     raw.getContext('2d').drawImage(img, 0, 0);
     var processed = ocrPreprocess(raw);
     var url = processed.toDataURL('image/png');
-    var result = await Tesseract.recognize(url, 'eng', { logger: function() {} });
+    var result = await Tesseract.recognize(url, 'eng+chi_sim', { logger: function() {} });
     var text = result.data.text || '';
+    console.log('[OCR raw text]', text);
     var parsed = parseOcrText(text);
+    console.log('[OCR parsed]', JSON.stringify(parsed));
     _ocrConfirmValues = {
       whiteEnergy: parsed.whiteEnergy !== undefined ? parsed.whiteEnergy : null,
       blueEnergy: parsed.blueEnergy !== undefined ? parsed.blueEnergy : null,
