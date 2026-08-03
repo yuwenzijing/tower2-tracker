@@ -65,11 +65,15 @@ async function handleOcr(request, env) {
     return jsonResponse({ error: '百度 OCR token 获取失败' }, 502);
   }
 
-  const ocrUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${token}`;
+  const ocrUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=${token}`;
+  const payload = 'image=' + encodeURIComponent(imageBase64);
+  if (payload.length > 4 * 1024 * 1024) {
+    return jsonResponse({ error: '图片过大，请缩小窗口后重试', size: payload.length }, 413);
+  }
   const ocrRes = await fetch(ocrUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'image=' + encodeURIComponent(imageBase64)
+    body: payload
   });
   const ocrData = await ocrRes.json();
 
@@ -78,7 +82,7 @@ async function handleOcr(request, env) {
   }
 
   const words = (ocrData.words_result || []).map(w => w.words);
-  return jsonResponse({ words, text: words.join(' ') });
+  return jsonResponse({ words, text: words.join(' '), count: words.length });
 }
 
 async function getBaiduToken(env, apiKey, secretKey) {
