@@ -281,6 +281,12 @@
     white-space: nowrap;
   }
   .simple-mode-toggle input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--purple); }
+  .toolbar-sep {
+    color: var(--border);
+    font-size: 14px;
+    margin: 0 2px;
+    user-select: none;
+  }
   .cost-toggle {
     display: inline-flex;
     align-items: center;
@@ -1819,6 +1825,7 @@
       <input type="checkbox" id="simpleModeToggle" onchange="toggleSimpleMode()" />
       <span>精简模式</span>
     </div>
+    <span class="toolbar-sep">|</span>
     <div class="cost-toggle" id="dungeonCostToggle" title="点击切换副本消耗模式">
       <span class="cost-toggle-label">单次副本消耗:</span>
       <span class="cost-toggle-val" id="dungeonCostVal" onclick="toggleDungeonCost()">80</span>
@@ -4043,7 +4050,7 @@ function closeOcrModal() {
 
 function parseOcrText(text) {
   var result = {};
-  var cleaned = text.replace(/[oO]/g, '0').replace(/[lI|]/g, '1').replace(/[sS](?=\d)/g, '5');
+  var cleaned = text.replace(/(?<=\d)[oO](?=\d)/g, '0').replace(/[lI|](?=\d)/g, '1');
   var audeMatch = cleaned.match(/(\d[\d,]*)\s*\(\s*\+?\s*(\d[\d,]*)\s*\)\s*\/\s*(\d[\d,]*)/);
   if (audeMatch) {
     result.whiteEnergy = parseInt(audeMatch[1].replace(/,/g, ''), 10);
@@ -4055,11 +4062,10 @@ function parseOcrText(text) {
     kinahs.sort(function(a, b) { return b - a; });
     result.kina = kinahs[0];
   }
-  var cpMatch = cleaned.match(/([\d]+(?:[.,]\d+)?)\s*[KkMm]/);
+  var cpMatch = cleaned.match(/(\d[\d,.]*)\s*[Kk]/);
   if (cpMatch) {
     var val = parseFloat(cpMatch[1].replace(/,/g, ''));
-    if (/[Mm]/i.test(cpMatch[0])) val *= 1000;
-    result.combatPower = Math.min(Math.round(val * 10) / 10, 9999);
+    if (val > 0) result.combatPower = Math.min(Math.round(val * 10) / 10, 9999);
   }
   var eqMatch = cleaned.match(/[装裝]\s*[等级]*\s*(\d{3,5})/);
   if (eqMatch) {
@@ -4103,12 +4109,14 @@ function renderOcrConfirmPanel() {
     var detected = cv[f.key];
     var current = cur[f.key];
     var hasDetected = detected !== null && detected !== undefined;
-    var changed = hasDetected && String(detected) !== String(current === null ? '' : current);
-    var inputVal = hasDetected ? detected : '';
+    var sameAsCurrent = hasDetected && String(detected) === String(current === null ? '' : current);
+    var changed = hasDetected && !sameAsCurrent;
+    var inputVal = changed ? detected : '';
+    var placeholder = hasDetected ? '无变化' : '未识别';
     return '<div class="ocr-field-row">' +
       '<span class="ocr-field-label">' + f.label + '</span>' +
       '<span class="ocr-field-val">' + ocrFmtVal(f.key, current) + '</span>' +
-      '<input class="ocr-field-input' + (changed ? ' changed' : '') + '" type="text" data-ocr-key="' + f.key + '" value="' + (hasDetected ? escapeHtml(String(inputVal)) : '') + '" placeholder="未识别" />' +
+      '<input class="ocr-field-input' + (changed ? ' changed' : '') + '" type="text" data-ocr-key="' + f.key + '" value="' + (changed ? escapeHtml(String(inputVal)) : '') + '" placeholder="' + placeholder + '" />' +
     '</div>';
   }).join('');
   return '<div class="ocr-confirm-panel" id="ocrConfirmPanel">' +
