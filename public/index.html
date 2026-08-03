@@ -1773,7 +1773,6 @@
     opacity: 0.85;
   }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -3981,32 +3980,24 @@ function ocrReselect() {
   else if (selectedChar) { openOcrCapture(selectedChar.accId, selectedChar.charId); }
 }
 
-function ocrPreprocess(srcCanvas) {
-  var W = srcCanvas.width, H = srcCanvas.height;
-  var canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  canvas.getContext('2d').drawImage(srcCanvas, 0, 0);
-  return canvas;
-}
-
 async function processOcrImage(imageDataUrl) {
-  if (typeof Tesseract === 'undefined') {
-    showToast('OCR 库正在加载，请稍后重试');
-    return;
-  }
   showToast('正在识别截图...');
   try {
-    var img = new Image();
-    img.src = imageDataUrl;
-    await new Promise(function(res) { img.onload = res; });
-    var raw = document.createElement('canvas');
-    raw.width = img.width; raw.height = img.height;
-    raw.getContext('2d').drawImage(img, 0, 0);
-    var processed = ocrPreprocess(raw);
-    var url = processed.toDataURL('image/png');
-    var result = await Tesseract.recognize(url, 'eng', { logger: function() {} });
-    var text = result.data.text || '';
+    var base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
+    var res = await fetch('/api/ocr', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64 })
+    });
+    var data = await res.json();
+    if (data.error) {
+      showToast('OCR 服务错误: ' + data.error);
+      showOcrConfirmModal(imageDataUrl);
+      return;
+    }
+    var text = data.text || '';
     console.log('[OCR raw text]', text);
+    console.log('[OCR words]', data.words);
     var parsed = parseOcrText(text);
     console.log('[OCR parsed]', JSON.stringify(parsed));
     _ocrConfirmValues = {
@@ -4020,7 +4011,8 @@ async function processOcrImage(imageDataUrl) {
     showOcrConfirmModal(imageDataUrl);
     showToast(found > 0 ? '识别完成，请确认数据' : '未识别到有效数据，可手动填写');
   } catch (e) {
-    showToast('OCR识别失败: ' + e.message);
+    showToast('OCR请求失败: ' + e.message);
+    showOcrConfirmModal(imageDataUrl);
   }
 }
 

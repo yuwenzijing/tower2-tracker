@@ -6,6 +6,10 @@ export default {
       return handleSync(request, env);
     }
 
+    if (url.pathname === '/api/ocr' && request.method === 'POST') {
+      return handleOcr(request, env);
+    }
+
     return env.ASSETS.fetch(request);
   }
 };
@@ -36,6 +40,59 @@ async function handleSync(request, env) {
   }
 
   return new Response('Method not allowed', { status: 405 });
+}
+
+async function handleOcr(request, env) {
+  const apiKey = env.BAIDU_OCR_API_KEY;
+  const secretKey = env.BAIDU_OCR_SECRET_KEY;
+  if (!apiKey || !secretKey) {
+    return jsonResponse({ error: 'OCR 服务未配置' }, 503);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch (e) {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+  const imageBase64 = body.image;
+  if (!imageBase64 || typeof imageBase64 !== 'string') {
+    return jsonResponse({ error: 'Missing image' }, 400);
+  }
+
+  const token = await getBaiduToken(env, apiKey, secretKey);
+  if (!token) {
+    return jsonResponse({ error: '百度 OCR token 获取失败' }, 502);
+  }
+
+  const ocrUrl = `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${token}`;
+  const ocrRes = await fetch(ocrUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'image=' + encodeURIComponent(imageBase64)
+  });
+  const ocrData = await ocrRes.json();
+
+  if (ocrData.error_code) {
+    return jsonResponse({ error: ocrData.error_msg || 'OCR failed', code: ocrData.error_code }, 502);
+  }
+
+  const words = (ocrData.words_result || []).map(w => w.words);
+  return jsonResponse({ words, text: words.join(' ') });
+}
+
+async function getBaiduToken(env, apiKey, secretKey) {
+  const cacheKey = '_baidu_ocr_token';
+  const cached = await env.SYNC_KV.get(cacheKey);
+  if (cached) return cached;
+
+  const tokenUrl = `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`;
+  const res = await fetch(tokenUrl, { method: 'POST' });
+  const data = await res.json();
+  if (!data.access_token) return null;
+
+  await env.SYNC_KV.put(cacheKey, data.access_token, { expirationTtl: data.expires_in || 2592000 });
+  return data.access_token;
 }
 
 function jsonResponse(data, status = 200) {
