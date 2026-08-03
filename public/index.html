@@ -3920,6 +3920,7 @@ function stopActivityScroll() {
 var _ocrAccId = null;
 var _ocrCharId = null;
 var _ocrConfirmValues = null;
+var _ocrRawWords = [];
 var _ocrStream = null;
 var _ocrVideo = null;
 
@@ -3955,12 +3956,17 @@ async function _ensureOcrStream() {
 function _captureFrame() {
   if (!_ocrVideo || !_ocrStream) return null;
   var vw = _ocrVideo.videoWidth, vh = _ocrVideo.videoHeight;
-  var maxW = 2048, scale = Math.min(1, maxW / vw);
+  var maxW = 1920, scale = Math.min(1, maxW / vw);
   var cw = Math.round(vw * scale), ch = Math.round(vh * scale);
   var canvas = document.createElement('canvas');
   canvas.width = cw; canvas.height = ch;
   canvas.getContext('2d').drawImage(_ocrVideo, 0, 0, cw, ch);
-  return canvas.toDataURL('image/jpeg', 0.85);
+  return canvas.toDataURL('image/jpeg', 0.75);
+}
+
+function _stopOcrStream() {
+  if (_ocrStream) { _ocrStream.getTracks().forEach(function(t) { t.stop(); }); }
+  _ocrStream = null; _ocrVideo = null;
 }
 
 async function openOcrCapture(accId, charId) {
@@ -3970,12 +3976,11 @@ async function openOcrCapture(accId, charId) {
   var ok = await _ensureOcrStream();
   if (!ok) return;
   var imageData = _captureFrame();
+  _stopOcrStream();
   if (imageData) processOcrImage(imageData);
 }
 
 function ocrReselect() {
-  if (_ocrStream) { _ocrStream.getTracks().forEach(function(t) { t.stop(); }); }
-  _ocrStream = null; _ocrVideo = null;
   closeOcrModal();
   var aId = _ocrAccId, cId = _ocrCharId;
   if (aId && cId) { openOcrCapture(aId, cId); }
@@ -4002,6 +4007,7 @@ async function processOcrImage(imageDataUrl) {
     console.log('[OCR words]', data.words, 'count:', data.count);
     var parsed = parseOcrText(text);
     console.log('[OCR parsed]', JSON.stringify(parsed));
+    _ocrRawWords = data.words || [];
     _ocrConfirmValues = {
       whiteEnergy: parsed.whiteEnergy !== undefined ? parsed.whiteEnergy : null,
       blueEnergy: parsed.blueEnergy !== undefined ? parsed.blueEnergy : null,
@@ -4037,6 +4043,7 @@ function closeOcrModal() {
   _ocrAccId = null;
   _ocrCharId = null;
   _ocrConfirmValues = null;
+  _stopOcrStream();
   var overlay = document.getElementById('ocrModalOverlay');
   if (overlay) { overlay.classList.remove('show'); overlay.style.display = 'none'; }
 }
@@ -4065,10 +4072,10 @@ function parseOcrText(text) {
     kinahs.sort(function(a, b) { return b - a; });
     if (kinahs.length > 0) result.kina = kinahs[0];
   }
-  var cpMatch = cleaned.match(/(\d[\d,.]*)\s*[Kk]/);
+  var cpMatch = cleaned.match(/(\d[\d,.]*)\s*[Kk](?![mM])/);
   if (cpMatch) {
     var val = parseFloat(cpMatch[1].replace(/,/g, ''));
-    if (val > 0) result.combatPower = Math.min(Math.round(val * 10) / 10, 9999);
+    if (val >= 10) result.combatPower = Math.min(Math.round(val * 10) / 10, 9999);
   }
   return result;
 }
@@ -4123,8 +4130,7 @@ function renderOcrConfirmPanel() {
     rows +
     '<div class="ocr-confirm-actions">' +
       '<button class="ocr-action-btn" onclick="closeOcrModal()">取消</button>' +
-      '<button class="ocr-action-btn" onclick="ocrRetake()">再截一次</button>' +
-      '<button class="ocr-action-btn" onclick="ocrReselect()">换窗口</button>' +
+      '<button class="ocr-action-btn" onclick="ocrRetake()">重新截图</button>' +
       '<button class="ocr-action-btn primary" onclick="applyOcrResults()">确认应用</button>' +
     '</div>' +
   '</div>';
@@ -4133,11 +4139,8 @@ function renderOcrConfirmPanel() {
 async function ocrRetake() {
   var aId = _ocrAccId, cId = _ocrCharId;
   closeOcrModal();
-  _ocrAccId = aId; _ocrCharId = cId;
-  if (!_ocrAccId && selectedChar) { _ocrAccId = selectedChar.accId; _ocrCharId = selectedChar.charId; }
-  if (!_ocrAccId) return;
-  var imageData = _captureFrame();
-  if (imageData) processOcrImage(imageData);
+  if (aId && cId) { openOcrCapture(aId, cId); }
+  else if (selectedChar) { openOcrCapture(selectedChar.accId, selectedChar.charId); }
 }
 
 function applyOcrResults() {
