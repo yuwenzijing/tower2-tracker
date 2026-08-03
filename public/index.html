@@ -281,6 +281,12 @@
     white-space: nowrap;
   }
   .simple-mode-toggle input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--purple); }
+  .toolbar-toggles {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
   .toolbar-sep {
     color: var(--border);
     font-size: 14px;
@@ -1821,14 +1827,16 @@
 <main>
   <div class="toolbar">
     <h2>账号列表</h2>
-    <div class="simple-mode-toggle">
-      <input type="checkbox" id="simpleModeToggle" onchange="toggleSimpleMode()" />
-      <span>精简模式</span>
-    </div>
-    <span class="toolbar-sep">|</span>
-    <div class="cost-toggle" id="dungeonCostToggle" title="点击切换副本消耗模式">
-      <span class="cost-toggle-label">单次副本消耗:</span>
-      <span class="cost-toggle-val" id="dungeonCostVal" onclick="toggleDungeonCost()">80</span>
+    <div class="toolbar-toggles">
+      <div class="simple-mode-toggle">
+        <input type="checkbox" id="simpleModeToggle" onchange="toggleSimpleMode()" />
+        <span>精简模式</span>
+      </div>
+      <span class="toolbar-sep">|</span>
+      <div class="cost-toggle" id="dungeonCostToggle" title="点击切换副本消耗模式">
+        <span class="cost-toggle-label">单次副本消耗:</span>
+        <span class="cost-toggle-val" id="dungeonCostVal" onclick="toggleDungeonCost()">80</span>
+      </div>
     </div>
     <div class="toolbar-actions">
       <button class="tool-btn sync" onclick="openSyncModal()">☁ 同步</button>
@@ -3970,9 +3978,9 @@ function ocrReselect() {
 
 function ocrPreprocess(srcCanvas) {
   var W = srcCanvas.width, H = srcCanvas.height;
-  var MAX_W = 2400;
-  var scale = W > MAX_W ? MAX_W / W : 1;
+  var scale = 2;
   var outW = Math.round(W * scale), outH = Math.round(H * scale);
+  if (outW > 4000) { scale = 4000 / W; outW = Math.round(W * scale); outH = Math.round(H * scale); }
   var canvas = document.createElement('canvas');
   canvas.width = outW; canvas.height = outH;
   var ctx = canvas.getContext('2d');
@@ -3982,10 +3990,9 @@ function ocrPreprocess(srcCanvas) {
   for (var i = 0; i < d.length; i += 4) {
     var r = d[i], g = d[i+1], b = d[i+2];
     var lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    var sat = Math.max(r, g, b) - Math.min(r, g, b);
-    var isGold = (r > 160 && g > 120 && b < 100 && r > g);
-    var isBright = lum > 140 || (Math.max(r, g, b) > 180 && sat < 80);
-    var v = (isBright || isGold) ? 255 : 0;
+    var isGold = (r > 140 && g > 100 && b < 120 && r > b);
+    var isBright = lum > 120 || Math.max(r, g, b) > 160;
+    var v = (isBright || isGold) ? 0 : 255;
     d[i] = d[i+1] = d[i+2] = v;
   }
   ctx.putImageData(imgData, 0, 0);
