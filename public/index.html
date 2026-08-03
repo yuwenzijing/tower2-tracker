@@ -284,23 +284,31 @@
   .cost-toggle {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 10px;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-dim);
+    user-select: none;
+  }
+  .cost-toggle-label {
+    color: var(--text-faint);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .cost-toggle-val {
+    display: inline-block;
+    min-width: 32px;
+    text-align: center;
+    padding: 2px 10px;
     border-radius: 6px;
     border: 1px solid var(--border);
     background: var(--glass-bg);
-    cursor: pointer;
-    font-size: 12px;
-    color: var(--text-dim);
-    transition: all 0.2s;
-    user-select: none;
-  }
-  .cost-toggle:hover { border-color: var(--text-dim); color: var(--text); }
-  .cost-toggle-val {
     font-weight: 700;
     color: var(--gold);
     font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: all 0.2s;
   }
+  .cost-toggle-val:hover { border-color: var(--gold); background: rgba(255,215,0,0.08); }
   .toolbar-actions {
     display: flex;
     gap: 8px;
@@ -1811,8 +1819,9 @@
       <input type="checkbox" id="simpleModeToggle" onchange="toggleSimpleMode()" />
       <span>精简模式</span>
     </div>
-    <div class="cost-toggle" id="dungeonCostToggle" onclick="toggleDungeonCost()" title="切换副本消耗模式">
-      <span class="cost-toggle-val" id="dungeonCostVal">80</span>
+    <div class="cost-toggle" id="dungeonCostToggle" title="点击切换副本消耗模式">
+      <span class="cost-toggle-label">单次副本消耗:</span>
+      <span class="cost-toggle-val" id="dungeonCostVal" onclick="toggleDungeonCost()">80</span>
     </div>
     <div class="toolbar-actions">
       <button class="tool-btn sync" onclick="openSyncModal()">☁ 同步</button>
@@ -3952,35 +3961,28 @@ function ocrReselect() {
   else if (selectedChar) { openOcrCapture(selectedChar.accId, selectedChar.charId); }
 }
 
-function ocrCropRegion(canvas, x, y, w, h, scale) {
-  scale = scale || 2;
-  var c = document.createElement('canvas');
-  c.width = w * scale; c.height = h * scale;
-  c.getContext('2d').drawImage(canvas, x, y, w, h, 0, 0, c.width, c.height);
-  return c;
-}
-
-function ocrEnhance(canvas) {
+function ocrPreprocess(srcCanvas) {
+  var W = srcCanvas.width, H = srcCanvas.height;
+  var MAX_W = 2400;
+  var scale = W > MAX_W ? MAX_W / W : 1;
+  var outW = Math.round(W * scale), outH = Math.round(H * scale);
+  var canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
   var ctx = canvas.getContext('2d');
-  var imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(srcCanvas, 0, 0, outW, outH);
+  var imgData = ctx.getImageData(0, 0, outW, outH);
   var d = imgData.data;
   for (var i = 0; i < d.length; i += 4) {
     var r = d[i], g = d[i+1], b = d[i+2];
     var lum = 0.299 * r + 0.587 * g + 0.114 * b;
-    var bright = Math.max(r, g, b);
-    var v = (bright > 120 || lum > 100) ? 255 : 0;
+    var sat = Math.max(r, g, b) - Math.min(r, g, b);
+    var isGold = (r > 160 && g > 120 && b < 100 && r > g);
+    var isBright = lum > 140 || (Math.max(r, g, b) > 180 && sat < 80);
+    var v = (isBright || isGold) ? 255 : 0;
     d[i] = d[i+1] = d[i+2] = v;
   }
   ctx.putImageData(imgData, 0, 0);
   return canvas;
-}
-
-async function ocrRegion(canvas, x, y, w, h) {
-  var cropped = ocrCropRegion(canvas, x, y, w, h, 3);
-  ocrEnhance(cropped);
-  var url = cropped.toDataURL('image/png');
-  var res = await Tesseract.recognize(url, 'eng', { logger: function() {} });
-  return res.data.text || '';
 }
 
 async function processOcrImage(imageDataUrl) {
@@ -3993,18 +3995,14 @@ async function processOcrImage(imageDataUrl) {
     var img = new Image();
     img.src = imageDataUrl;
     await new Promise(function(res) { img.onload = res; });
-    var W = img.width, H = img.height;
     var raw = document.createElement('canvas');
-    raw.width = W; raw.height = H;
+    raw.width = img.width; raw.height = img.height;
     raw.getContext('2d').drawImage(img, 0, 0);
-
-    var topH = Math.round(H * 0.06);
-    var botH = Math.round(H * 0.08);
-    var topText = await ocrRegion(raw, 0, 0, W, topH);
-    var botText = await ocrRegion(raw, 0, H - botH, W, botH);
-    var allText = topText + '\n' + botText;
-
-    var parsed = parseOcrText(allText);
+    var processed = ocrPreprocess(raw);
+    var url = processed.toDataURL('image/png');
+    var result = await Tesseract.recognize(url, 'eng', { logger: function() {} });
+    var text = result.data.text || '';
+    var parsed = parseOcrText(text);
     _ocrConfirmValues = {
       whiteEnergy: parsed.whiteEnergy !== undefined ? parsed.whiteEnergy : null,
       blueEnergy: parsed.blueEnergy !== undefined ? parsed.blueEnergy : null,
