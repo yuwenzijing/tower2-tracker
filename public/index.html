@@ -281,6 +281,26 @@
     white-space: nowrap;
   }
   .simple-mode-toggle input { cursor: pointer; width: 15px; height: 15px; accent-color: var(--purple); }
+  .cost-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .cost-toggle:hover { border-color: var(--text-dim); color: var(--text); }
+  .cost-toggle-val {
+    font-weight: 700;
+    color: var(--gold);
+    font-variant-numeric: tabular-nums;
+  }
   .toolbar-actions {
     display: flex;
     gap: 8px;
@@ -600,6 +620,13 @@
     letter-spacing: 0.5px;
     flex-shrink: 0;
   }
+  .directive-sep {
+    color: var(--text-faint);
+    font-size: 14px;
+    opacity: 0.4;
+    margin: 0 2px;
+    user-select: none;
+  }
   .directive-item {
     display: flex;
     align-items: center;
@@ -896,6 +923,20 @@
   }
   .energy-op-btn.undo-icon:not(:disabled):hover { color: var(--gold); border-color: var(--gold); }
   .energy-op-btn.undo-icon sup { font-size: 9px; margin-left: 1px; font-weight: 700; }
+  .energy-op-btn.ocr-btn {
+    padding: 4px 8px;
+    color: var(--cyan);
+    border-color: rgba(34,221,255,0.25);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .energy-op-btn.ocr-btn:not(:disabled):hover {
+    color: var(--cyan);
+    border-color: var(--cyan);
+    background: rgba(34,221,255,0.1);
+  }
+  .energy-op-btn.ocr-btn svg { display: block; }
 
   /* ===== Energy Pools (simplified) ===== */
   .energy-section {
@@ -1588,12 +1629,200 @@
     }
     .char-list { grid-template-columns: 1fr 1fr 1fr; }
   }
+
+  /* ===== OCR 截图识别弹窗 ===== */
+  .ocr-modal-overlay {
+    background: rgba(0,0,0,0.6);
+    z-index: 1050;
+  }
+  .ocr-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    border-radius: var(--radius);
+    padding: 20px 22px 18px;
+    max-width: 520px;
+    width: 92%;
+    max-height: 88vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  .ocr-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-faint);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    line-height: 1;
+  }
+  .ocr-modal-close:hover { color: var(--text); border-color: var(--text-dim); background: rgba(255,255,255,0.04); }
+  .ocr-modal h3 {
+    font-size: 16px;
+    margin: 0 36px 14px 0;
+    color: var(--cyan);
+    font-weight: 700;
+  }
+  .ocr-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+  }
+  .ocr-tab {
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    color: var(--text-dim);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .ocr-tab:hover { border-color: var(--text-dim); color: var(--text); }
+  .ocr-tab.active {
+    color: var(--cyan);
+    border-color: rgba(34,221,255,0.4);
+    background: rgba(34,221,255,0.1);
+  }
+  .ocr-capture-area {
+    min-height: 140px;
+    border: 2px dashed rgba(255,255,255,0.12);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 20px 16px;
+    background: rgba(0,0,0,0.2);
+    transition: border-color 0.2s;
+  }
+  .ocr-capture-area.paste-active { border-color: rgba(34,221,255,0.35); }
+  .ocr-capture-hint {
+    font-size: 13px;
+    color: var(--text-faint);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .ocr-action-btn {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--glass-bg);
+    color: var(--text-dim);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .ocr-action-btn:hover { border-color: var(--text-dim); color: var(--text); }
+  .ocr-action-btn.primary {
+    background: rgba(34,221,255,0.15);
+    color: var(--cyan);
+    border-color: rgba(34,221,255,0.35);
+  }
+  .ocr-action-btn.primary:hover { background: rgba(34,221,255,0.25); }
+  .ocr-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .ocr-preview-wrap {
+    margin-top: 14px;
+    display: none;
+  }
+  .ocr-preview-wrap.show { display: block; }
+  .ocr-preview-img {
+    width: 100%;
+    max-height: 220px;
+    object-fit: contain;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(0,0,0,0.3);
+  }
+  .ocr-preview-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    justify-content: flex-end;
+  }
+  .ocr-file-input { display: none; }
+  .ocr-confirm-panel {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--glass-border);
+  }
+  .ocr-confirm-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .ocr-field-row {
+    display: grid;
+    grid-template-columns: 88px 1fr 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .ocr-field-row.header {
+    color: var(--text-faint);
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .ocr-field-label { color: var(--text-dim); font-weight: 600; }
+  .ocr-field-val {
+    color: var(--text-faint);
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .ocr-field-input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: rgba(0,0,0,0.25);
+    color: var(--text);
+    font-size: 12px;
+    outline: none;
+    font-family: inherit;
+  }
+  .ocr-field-input:focus { border-color: var(--cyan); }
+  .ocr-field-input.changed {
+    border-color: rgba(240,204,85,0.5);
+    background: rgba(240,204,85,0.06);
+    color: var(--gold);
+  }
+  .ocr-confirm-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    justify-content: flex-end;
+  }
+  .char-kina-hint {
+    font-size: 11px;
+    color: var(--red);
+    font-weight: 600;
+    margin-left: 8px;
+    opacity: 0.85;
+  }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.1.5</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.3.0</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -1645,6 +1874,9 @@
     <div class="simple-mode-toggle">
       <input type="checkbox" id="simpleModeToggle" onchange="toggleSimpleMode()" />
       <span>精简模式</span>
+    </div>
+    <div class="cost-toggle" id="dungeonCostToggle" onclick="toggleDungeonCost()" title="切换副本消耗模式">
+      <span class="cost-toggle-val" id="dungeonCostVal">80</span>
     </div>
     <div class="toolbar-actions">
       <button class="tool-btn sync" onclick="openSyncModal()">☁ 同步</button>
@@ -1716,6 +1948,11 @@
   </div>
 </div>
 
+<!-- OCR 截图识别弹窗 -->
+<div class="ocr-modal-overlay modal-overlay" id="ocrModalOverlay">
+  <div class="ocr-modal" id="ocrModalContent"></div>
+</div>
+
 <!-- 基纳未保存提示弹窗 -->
 <div class="kina-confirm-overlay modal-overlay" id="kinaConfirmOverlay">
   <div class="kina-confirm-box">
@@ -1731,7 +1968,12 @@
 // ====== 常量配置 ======
 const WHITE_CAP = 840;    // 白奥德上限
 const BLUE_CAP  = 2000;   // 蓝奥德上限
-const DUNGEON_COST = 80;  // 每次副本消耗能量
+var dungeonCostHigh = false; // false=normal(80/40), true=high(120/60)
+function getDungeonCost(acc) {
+  var mem = getMem(acc);
+  if (mem.key === 'none') return dungeonCostHigh ? 60 : 40;
+  return dungeonCostHigh ? 120 : 80;
+}
 
 // 会员配置：stepAmount = 每3小时阶梯增加量
 const MEMBERSHIPS = [
@@ -2068,7 +2310,7 @@ function calcAccountDungeonRuns(acc) {
 function calcDungeonRuns(acc, ch) {
   const white = calcWhiteEnergy(acc, ch);
   const totalEnergy = Math.floor(white.displayEnergy) + calcBlueEnergyTotal(ch);
-  return Math.floor(totalEnergy / DUNGEON_COST);
+  return Math.floor(totalEnergy / getDungeonCost(acc));
 }
 
 // 今日白奥德是否达到上限
@@ -2147,6 +2389,12 @@ var DIRECTIVE_ITEMS = [
   { key: 'morheim', label: '莫尔海姆' },
   { key: 'abyssLower', label: '深渊下层' },
   { key: 'abyssMiddle', label: '深渊中层' }
+];
+var BATTLEFIELD_ITEMS = [
+  { key: 'battlefield3', label: '战场三连' }
+];
+var DAILY_DUNGEON_ITEMS = [
+  { key: 'dailyDungeon', label: '每日副本' }
 ];
 
 function isDirectiveDone(acc, key) {
@@ -2246,12 +2494,14 @@ function loadData() {
       DATA = JSON.parse(raw);
       if (!DATA.accounts) DATA.accounts = [];
       DATA.accounts.forEach(ensureAccDefaults);
+      dungeonCostHigh = DATA._dungeonCostHigh || false;
     }
   } catch(e) { console.error('load error', e); }
 }
 
 function saveData(skipSync) {
   DATA._lastModified = new Date().toISOString();
+  DATA._dungeonCostHigh = dungeonCostHigh;
   localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
   if (!skipSync) debouncedSyncPush();
 }
@@ -2266,6 +2516,7 @@ function addAccount() {
     membershipDays: null,
     membershipHours: null,
     membershipSetAt: null,
+    directives: {},
     characters: []
   };
   pushUndo();
@@ -2482,6 +2733,12 @@ function toggleSimpleMode() {
   if (simpleMode) renderSimpleMode();
 }
 
+function toggleDungeonCost() {
+  dungeonCostHigh = !dungeonCostHigh;
+  saveData();
+  render();
+}
+
 function getTodoCount(ch) {
   return [
     'sanctuary1', 'sanctuary2', 'sanctuary3',
@@ -2579,6 +2836,8 @@ function setSort(column) {
 
 // ====== 渲染 ======
 function render() {
+  var costValEl = document.getElementById('dungeonCostVal');
+  if (costValEl) costValEl.textContent = dungeonCostHigh ? '120' : '80';
   if (simpleMode) { renderSimpleMode(); updateSummary(); updateGlobalUndoBtn(); return; }
   const list = document.getElementById('accountList');
   list.innerHTML = '';
@@ -2644,7 +2903,24 @@ function render() {
           var done = isDirectiveDone(acc, d.key);
           return '<div class="directive-item ' + (done ? 'done' : '') + '" onclick="toggleDirective(\'' + acc.id + '\',\'' + d.key + '\')">' +
             '<div class="todo-checkbox">' + (done ? '✓' : '') + '</div>' +
-            '<span class="todo-label">' + d.label + '</span></div>';
+            '<span class="todo-label">' + d.label + '</span>' +
+          '</div>';
+        }).join('')}
+        <span class="directive-sep">|</span>
+        ${BATTLEFIELD_ITEMS.map(function(d) {
+          var done = isDirectiveDone(acc, d.key);
+          return '<div class="directive-item ' + (done ? 'done' : '') + '" onclick="toggleDirective(\'' + acc.id + '\',\'' + d.key + '\')">' +
+            '<div class="todo-checkbox">' + (done ? '✓' : '') + '</div>' +
+            '<span class="todo-label">' + d.label + '</span>' +
+          '</div>';
+        }).join('')}
+        <span class="directive-sep">|</span>
+        ${DAILY_DUNGEON_ITEMS.map(function(d) {
+          var done = isDirectiveDone(acc, d.key);
+          return '<div class="directive-item ' + (done ? 'done' : '') + '" onclick="toggleDirective(\'' + acc.id + '\',\'' + d.key + '\')">' +
+            '<div class="todo-checkbox">' + (done ? '✓' : '') + '</div>' +
+            '<span class="todo-label">' + d.label + '</span>' +
+          '</div>';
         }).join('')}
       </div>
       <div class="char-list" id="charlist-${acc.id}"></div>
@@ -2688,6 +2964,12 @@ function render() {
           var canAdd10 = !cooldown && canEnergyAdd(ch, 10);
           var canUndoEnergy = !cooldown && hasCharEnergyUndo(acc.id, ch.id);
           energyOpsHtml = '<div class="energy-ops">' +
+            '<button class="energy-op-btn ocr-btn" onclick="event.stopPropagation();openOcrModal(\'' + acc.id + '\',\'' + ch.id + '\')" title="截图识别">' +
+              '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>' +
+                '<circle cx="12" cy="13" r="4"/>' +
+              '</svg>' +
+            '</button>' +
             '<button class="energy-op-btn sub" ' + (canSub120 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub120\')">-120</button>' +
             '<button class="energy-op-btn sub" ' + (canSub80 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub80\')">-80</button>' +
             '<button class="energy-op-btn add" ' + (canAdd40 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'add40\')">+40</button>' +
@@ -2732,6 +3014,7 @@ function render() {
             <span>剩余副本</span>
             <span class="dungeon-count">${dungeonRuns}</span>
             <span class="dungeon-unit">次</span>
+            ${ch.kina ? '<span class="char-kina-hint" title="基纳">' + formatKina(ch.kina) + '</span>' : ''}
             ${energyOpsHtml}
           </div>
           <div class="energy-section">
@@ -2963,6 +3246,7 @@ function updateSummary() {
 
 // ====== 导入导出 ======
 function exportData() {
+  DATA._dungeonCostHigh = dungeonCostHigh;
   const json = JSON.stringify(DATA, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
@@ -2994,6 +3278,7 @@ function importData(event) {
       }
       obj.accounts.forEach(ensureAccDefaults);
       DATA = obj;
+      dungeonCostHigh = DATA._dungeonCostHigh || false;
       undoStack = [];
       charEnergyUndoStacks = {};
       selectedChar = null;
@@ -3509,6 +3794,7 @@ function showSyncConflictDialog(localMod, cloudMod, cloudData, isFirstSync) {
   var overlay = document.getElementById('syncModalOverlay');
   var content = document.getElementById('syncModalContent');
   var title = isFirstSync ? '<h3>\u26a0 该口令已有云端数据</h3>' : '<h3>\u26a0 数据不一致</h3>';
+  var passphraseLine = '<p style="font-size:12px;color:var(--cyan);margin-bottom:8px">当前口令：<strong>' + escapeHtml(getSyncPassphrase() || '') + '</strong></p>';
   var desc = isFirstSync
     ? '<p>该口令下已有云端数据，请确认是否为你的数据。如果不是，请更换口令。</p>'
     : '<p>本地数据和云端数据不一致，请选择保留哪一份：</p>';
@@ -3521,7 +3807,7 @@ function showSyncConflictDialog(localMod, cloudMod, cloudData, isFirstSync) {
         '<button class="sync-btn use-local" onclick="resolveConflict(\'local\')" style="flex:1">使用本地数据</button>' +
         '<button class="sync-btn use-cloud" onclick="resolveConflict(\'cloud\')" style="flex:1">使用云端数据</button>' +
       '</div>';
-  content.innerHTML = title + desc +
+  content.innerHTML = title + passphraseLine + desc +
     '<div class="sync-conflict-info">' +
       '<div class="sync-conflict-row"><span class="label">\ud83d\udcf1 本地数据</span><span class="time">' + formatSyncTime(localMod) + '</span></div>' +
       '<div class="sync-conflict-row" style="font-size:12px;color:var(--text-faint)"><span>' + localAcc + ' 个账号</span></div>' +
@@ -3550,6 +3836,7 @@ async function resolveConflict(choice) {
     if (cd.accounts) cd.accounts.forEach(ensureAccDefaults);
     DATA = cd;
     DATA._lastModified = _syncCloudCache.modified;
+    dungeonCostHigh = DATA._dungeonCostHigh || false;
     undoStack = [];
     charEnergyUndoStacks = {};
     selectedChar = null;
@@ -3664,6 +3951,349 @@ function showActivityAtIndex(body, idx) {
 
 function stopActivityScroll() {
   if (_activityScrollTimer) { clearInterval(_activityScrollTimer); _activityScrollTimer = null; }
+}
+
+// ====== OCR 截图识别 ======
+var _ocrAccId = null;
+var _ocrCharId = null;
+var _ocrImageData = null;
+var _captureStream = null;
+var _ocrActiveTab = 'paste';
+var _ocrConfirmValues = null;
+
+function ocrSupportsScreenCapture() {
+  return !!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia);
+}
+
+function openOcrModal(accId, charId) {
+  _ocrAccId = accId;
+  _ocrCharId = charId;
+  _ocrImageData = null;
+  _ocrConfirmValues = null;
+  _ocrActiveTab = ocrSupportsScreenCapture() ? 'screen' : 'paste';
+  var overlay = document.getElementById('ocrModalOverlay');
+  if (overlay) { overlay.classList.add('show'); overlay.style.display = 'flex'; }
+  renderOcrModal();
+  document.addEventListener('paste', handleOcrPaste);
+}
+
+function closeOcrModal() {
+  stopCaptureStream();
+  document.removeEventListener('paste', handleOcrPaste);
+  _ocrAccId = null;
+  _ocrCharId = null;
+  _ocrImageData = null;
+  _ocrConfirmValues = null;
+  var overlay = document.getElementById('ocrModalOverlay');
+  if (overlay) { overlay.classList.remove('show'); overlay.style.display = 'none'; }
+}
+
+function stopCaptureStream() {
+  if (_captureStream) {
+    _captureStream.getTracks().forEach(function(t) { t.stop(); });
+    _captureStream = null;
+  }
+}
+
+function switchOcrTab(tab) {
+  if (_ocrActiveTab === 'screen' && tab !== 'screen') stopCaptureStream();
+  _ocrActiveTab = tab;
+  _ocrImageData = null;
+  _ocrConfirmValues = null;
+  renderOcrModal();
+}
+
+function renderOcrModal() {
+  var content = document.getElementById('ocrModalContent');
+  if (!content) return;
+  var r = findChar(_ocrAccId, _ocrCharId);
+  var charName = r ? (r.ch.name || '未命名') : '';
+  var hasScreen = ocrSupportsScreenCapture();
+  var tabsHtml = '';
+  if (hasScreen) {
+    tabsHtml += '<button class="ocr-tab' + (_ocrActiveTab === 'screen' ? ' active' : '') + '" onclick="switchOcrTab(\'screen\')">屏幕捕获</button>';
+  }
+  tabsHtml += '<button class="ocr-tab' + (_ocrActiveTab === 'paste' ? ' active' : '') + '" onclick="switchOcrTab(\'paste\')">粘贴截图</button>';
+  tabsHtml += '<button class="ocr-tab' + (_ocrActiveTab === 'upload' ? ' active' : '') + '" onclick="switchOcrTab(\'upload\')">上传图片</button>';
+
+  var captureHtml = '';
+  if (_ocrActiveTab === 'screen') {
+    if (!_captureStream) {
+      captureHtml = '<div class="ocr-capture-area">' +
+        '<div class="ocr-capture-hint">共享游戏窗口或屏幕，然后截取画面进行识别</div>' +
+        '<button class="ocr-action-btn primary" onclick="startScreenCapture()">开始共享</button>' +
+      '</div>';
+    } else {
+      captureHtml = '<div class="ocr-capture-area">' +
+        '<div class="ocr-capture-hint">屏幕共享中，点击截取当前画面</div>' +
+        '<button class="ocr-action-btn primary" onclick="captureFrameFromStream()">截取画面</button>' +
+        '<button class="ocr-action-btn" onclick="stopCaptureStream();renderOcrModal()">停止共享</button>' +
+      '</div>';
+    }
+  } else if (_ocrActiveTab === 'paste') {
+    captureHtml = '<div class="ocr-capture-area paste-active" tabindex="0" id="ocrPasteArea">' +
+      '<div class="ocr-capture-hint">按 Ctrl+V 粘贴截图<br><span style="font-size:11px;color:var(--text-faint)">点击此区域后粘贴</span></div>' +
+    '</div>';
+  } else {
+    captureHtml = '<div class="ocr-capture-area">' +
+      '<div class="ocr-capture-hint">选择游戏截图文件（PNG/JPG）</div>' +
+      '<button class="ocr-action-btn primary" onclick="document.getElementById(\'ocrFileInput\').click()">选择图片</button>' +
+      '<input type="file" id="ocrFileInput" class="ocr-file-input" accept="image/*" onchange="handleOcrFileUpload(event)" />' +
+    '</div>';
+  }
+
+  var previewHtml = '';
+  if (_ocrImageData) {
+    previewHtml = '<div class="ocr-preview-wrap show">' +
+      '<img class="ocr-preview-img" src="' + _ocrImageData + '" alt="截图预览" />' +
+      '<div class="ocr-preview-actions">' +
+        '<button class="ocr-action-btn" onclick="clearOcrImage()">重新选择</button>' +
+        '<button class="ocr-action-btn primary" id="ocrRunBtn" onclick="startOcrRecognition()">开始识别</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  var confirmHtml = _ocrConfirmValues ? renderOcrConfirmPanel() : '';
+
+  content.innerHTML =
+    '<button class="ocr-modal-close" onclick="closeOcrModal()" title="关闭">\u00d7</button>' +
+    '<h3>截图识别 · ' + escapeHtml(charName) + '</h3>' +
+    '<div class="ocr-tabs">' + tabsHtml + '</div>' +
+    captureHtml +
+    previewHtml +
+    confirmHtml;
+
+  if (_ocrActiveTab === 'paste') {
+    var pasteArea = document.getElementById('ocrPasteArea');
+    if (pasteArea) pasteArea.focus();
+  }
+}
+
+function clearOcrImage() {
+  _ocrImageData = null;
+  _ocrConfirmValues = null;
+  renderOcrModal();
+}
+
+function setOcrImage(dataUrl) {
+  _ocrImageData = dataUrl;
+  _ocrConfirmValues = null;
+  renderOcrModal();
+}
+
+async function startScreenCapture() {
+  try {
+    _captureStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { cursor: 'never' },
+      audio: false
+    });
+    _captureStream.getVideoTracks()[0].addEventListener('ended', function() {
+      _captureStream = null;
+      renderOcrModal();
+    });
+    renderOcrModal();
+  } catch (e) {
+    showToast('屏幕共享被取消');
+  }
+}
+
+function captureFrameFromStream() {
+  if (!_captureStream) return;
+  var video = document.createElement('video');
+  video.srcObject = _captureStream;
+  video.onloadedmetadata = function() {
+    video.play();
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    setOcrImage(canvas.toDataURL('image/png'));
+  };
+}
+
+function handleOcrPaste(e) {
+  if (!_ocrAccId || _ocrActiveTab !== 'paste') return;
+  var items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf('image') !== -1) {
+      e.preventDefault();
+      var blob = items[i].getAsFile();
+      var reader = new FileReader();
+      reader.onload = function(ev) { setOcrImage(ev.target.result); };
+      reader.readAsDataURL(blob);
+      return;
+    }
+  }
+}
+
+function handleOcrFileUpload(e) {
+  var file = e.target.files && e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev) { setOcrImage(ev.target.result); };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
+
+function parseOcrText(text) {
+  var result = {};
+  var audeMatch = text.match(/(\d+)\s*\(\+?\s*(\d[\d,]*)\)\s*\/\s*(\d+)/);
+  if (audeMatch) {
+    result.whiteEnergy = parseInt(audeMatch[1], 10);
+    result.blueEnergy = parseInt(audeMatch[2].replace(/,/g, ''), 10);
+  }
+  var kinahMatches = text.match(/(\d{1,3}(?:,\d{3}){2,})/g);
+  if (kinahMatches) {
+    var kinahs = kinahMatches.map(function(k) { return parseInt(k.replace(/,/g, ''), 10); });
+    result.kina = Math.max.apply(null, kinahs);
+  }
+  var cpMatch = text.match(/([\d,.]+)\s*[KkMm]/);
+  if (cpMatch) {
+    var val = parseFloat(cpMatch[1].replace(/,/g, ''));
+    if (/[Mm]/.test(cpMatch[0])) val *= 1000000;
+    else if (/[Kk]/.test(cpMatch[0])) val *= 1000;
+    result.combatPowerRaw = Math.round(val);
+    result.combatPower = Math.min(Math.round(val / 1000 * 10) / 10, 1000);
+  }
+  var eqMatch = text.match(/[装裝]\s*[等级]*\s*(\d{3,5})/);
+  if (eqMatch) {
+    result.itemLevel = parseInt(eqMatch[1], 10);
+  }
+  return result;
+}
+
+function getOcrCurrentValues() {
+  var r = findChar(_ocrAccId, _ocrCharId);
+  if (!r) return {};
+  var ch = r.ch;
+  var energy = calcWhiteEnergy(r.acc, ch);
+  return {
+    whiteEnergy: Math.floor(energy.displayEnergy),
+    blueEnergy: ch.blueEnergy || 0,
+    kina: (ch.kina === null || ch.kina === undefined) ? null : ch.kina,
+    combatPower: (ch.combatPower === null || ch.combatPower === undefined) ? null : ch.combatPower,
+    itemLevel: (ch.itemLevel === null || ch.itemLevel === undefined) ? null : ch.itemLevel
+  };
+}
+
+function ocrFmtVal(key, val) {
+  if (val === null || val === undefined || val === '') return '—';
+  if (key === 'kina') return formatKina(val);
+  if (key === 'combatPower') return val + 'K';
+  return String(val);
+}
+
+function renderOcrConfirmPanel() {
+  var cur = getOcrCurrentValues();
+  var fields = [
+    { key: 'whiteEnergy', label: '白奥德' },
+    { key: 'blueEnergy', label: '蓝奥德' },
+    { key: 'kina', label: '基纳' },
+    { key: 'combatPower', label: '战力' },
+    { key: 'itemLevel', label: '装备等级' }
+  ];
+  var rows = fields.map(function(f) {
+    var detected = _ocrConfirmValues[f.key];
+    var current = cur[f.key];
+    var hasDetected = detected !== null && detected !== undefined;
+    var changed = hasDetected && String(detected) !== String(current === null ? '' : current);
+    var inputVal = hasDetected ? detected : '';
+    return '<div class="ocr-field-row">' +
+      '<span class="ocr-field-label">' + f.label + '</span>' +
+      '<span class="ocr-field-val">' + ocrFmtVal(f.key, current) + '</span>' +
+      '<input class="ocr-field-input' + (changed ? ' changed' : '') + '" type="text" data-ocr-key="' + f.key + '" value="' + (hasDetected ? escapeHtml(String(inputVal)) : '') + '" placeholder="未识别" />' +
+    '</div>';
+  }).join('');
+  return '<div class="ocr-confirm-panel" id="ocrConfirmPanel">' +
+    '<div class="ocr-confirm-title">识别结果确认</div>' +
+    '<div class="ocr-field-row header"><span>字段</span><span>当前值</span><span>识别值（可编辑）</span></div>' +
+    rows +
+    '<div class="ocr-confirm-actions">' +
+      '<button class="ocr-action-btn" onclick="closeOcrModal()">取消</button>' +
+      '<button class="ocr-action-btn primary" onclick="applyOcrResults()">确认应用</button>' +
+    '</div>' +
+  '</div>';
+}
+
+async function startOcrRecognition() {
+  if (!_ocrImageData) return;
+  if (typeof Tesseract === 'undefined') {
+    showToast('OCR 库未加载，请检查网络');
+    return;
+  }
+  var btn = document.getElementById('ocrRunBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '识别中...'; }
+  showToast('正在识别...');
+  try {
+    var result = await Tesseract.recognize(_ocrImageData, 'chi_sim+eng', {
+      logger: function() {}
+    });
+    var text = result.data.text || '';
+    var parsed = parseOcrText(text);
+    _ocrConfirmValues = {
+      whiteEnergy: parsed.whiteEnergy !== undefined ? parsed.whiteEnergy : null,
+      blueEnergy: parsed.blueEnergy !== undefined ? parsed.blueEnergy : null,
+      kina: parsed.kina !== undefined ? parsed.kina : null,
+      combatPower: parsed.combatPower !== undefined ? parsed.combatPower : null,
+      itemLevel: parsed.itemLevel !== undefined ? parsed.itemLevel : null
+    };
+    renderOcrModal();
+    var found = Object.keys(parsed).filter(function(k) { return k !== 'combatPowerRaw'; }).length;
+    showToast(found > 0 ? '识别完成，请确认数据' : '未识别到有效数据，请手动填写');
+  } catch (e) {
+    showToast('OCR识别失败: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = '开始识别'; }
+  }
+}
+
+function applyOcrResults() {
+  var r = findChar(_ocrAccId, _ocrCharId);
+  if (!r) return;
+  var panel = document.getElementById('ocrConfirmPanel');
+  if (!panel) return;
+  var inputs = panel.querySelectorAll('.ocr-field-input');
+  var values = {};
+  inputs.forEach(function(inp) {
+    var key = inp.getAttribute('data-ocr-key');
+    var raw = inp.value.trim();
+    if (raw === '') return;
+    if (key === 'kina') {
+      values[key] = parseKinaVal(raw);
+    } else if (key === 'combatPower') {
+      var n = parseFloat(raw.replace(/,/g, ''));
+      values[key] = (isNaN(n) || n <= 0) ? null : Math.min(Math.round(n * 10) / 10, 1000);
+    } else {
+      var n2 = parseInt(raw.replace(/,/g, ''), 10);
+      if (!isNaN(n2)) values[key] = n2;
+    }
+  });
+  if (Object.keys(values).length === 0) {
+    showToast('没有可应用的数据');
+    return;
+  }
+  pushUndo();
+  var ch = r.ch;
+  if (values.whiteEnergy !== undefined) {
+    ch.whiteEnergy = Math.max(0, Math.min(WHITE_CAP, values.whiteEnergy));
+    ch.whiteTimestamp = new Date().toISOString();
+  }
+  if (values.blueEnergy !== undefined) {
+    ch.blueEnergy = Math.max(0, Math.min(BLUE_CAP, values.blueEnergy));
+  }
+  if (values.kina !== undefined) {
+    ch.kina = values.kina;
+  }
+  if (values.combatPower !== undefined) {
+    ch.combatPower = values.combatPower;
+  }
+  if (values.itemLevel !== undefined) {
+    ch.itemLevel = (values.itemLevel <= 0) ? null : Math.min(values.itemLevel, 6500);
+  }
+  saveData();
+  render();
+  closeOcrModal();
+  showToast('OCR 数据已应用');
 }
 
 // ====== Init ======
