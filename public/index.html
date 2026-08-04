@@ -1777,7 +1777,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.3.0</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.3.1</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -1839,6 +1839,7 @@
     </div>
     <div class="toolbar-actions">
       <button class="tool-btn sync" onclick="openSyncModal()">☁ 同步</button>
+      <button class="tool-btn capture" onclick="openCapturePairing()">数据采集</button>
       <button class="tool-btn undo" id="globalUndoBtn" onclick="undoAction()" disabled>撤回</button>
       <button class="tool-btn export" onclick="exportData()">导出数据</button>
       <button class="tool-btn import" onclick="document.getElementById('importFile').click()">导入数据</button>
@@ -1907,11 +1908,6 @@
   </div>
 </div>
 
-<!-- OCR 截图识别弹窗 -->
-<div class="ocr-modal-overlay modal-overlay" id="ocrModalOverlay">
-  <div class="ocr-modal" id="ocrModalContent"></div>
-</div>
-
 <!-- 基纳未保存提示弹窗 -->
 <div class="kina-confirm-overlay modal-overlay" id="kinaConfirmOverlay">
   <div class="kina-confirm-box">
@@ -1973,6 +1969,7 @@ const CLASS_ICONS = {
 // ====== 全局状态 ======
 let DATA = { accounts: [] };
 var undoStack = [];
+var undoMetaStack = [];
 var UNDO_MAX = 5;
 var selectedChar = null; // { accId, charId } or null
 var charEnergyUndoStacks = {}; // { "accId-charId": [{white, blue}, ...] }
@@ -1991,14 +1988,19 @@ function findChar(accId, charId) {
   return { acc: acc, ch: ch };
 }
 
-function pushUndo() {
+function pushUndo(meta) {
   undoStack.push(JSON.parse(JSON.stringify(DATA)));
-  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  undoMetaStack.push(meta || null);
+  if (undoStack.length > UNDO_MAX) {
+    undoStack.shift();
+    undoMetaStack.shift();
+  }
 }
 
 function undoAction() {
   if (undoStack.length === 0) return;
   DATA = undoStack.pop();
+  undoMetaStack.pop();
   saveData();
   render();
   showToast('已撤回（剩余' + undoStack.length + '步）');
@@ -2928,12 +2930,6 @@ function render() {
           var canAdd10 = !cooldown && canEnergyAdd(ch, 10);
           var canUndoEnergy = !cooldown && hasCharEnergyUndo(acc.id, ch.id);
           energyOpsHtml = '<div class="energy-ops">' +
-            '<button class="energy-op-btn ocr-btn" onclick="event.stopPropagation();openOcrCapture(\'' + acc.id + '\',\'' + ch.id + '\')" title="截图识别">' +
-              '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>' +
-                '<circle cx="12" cy="13" r="4"/>' +
-              '</svg>' +
-            '</button>' +
             '<button class="energy-op-btn sub" ' + (canSub120 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub120\')">-120</button>' +
             '<button class="energy-op-btn sub" ' + (canSub80 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'sub80\')">-80</button>' +
             '<button class="energy-op-btn add" ' + (canAdd40 ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'add40\')">+40</button>' +
@@ -3243,6 +3239,7 @@ function importData(event) {
       DATA = obj;
       dungeonCostHigh = DATA._dungeonCostHigh || false;
       undoStack = [];
+      undoMetaStack = [];
       charEnergyUndoStacks = {};
       selectedChar = null;
       saveData();
@@ -3801,6 +3798,7 @@ async function resolveConflict(choice) {
     DATA._lastModified = _syncCloudCache.modified;
     dungeonCostHigh = DATA._dungeonCostHigh || false;
     undoStack = [];
+    undoMetaStack = [];
     charEnergyUndoStacks = {};
     selectedChar = null;
     localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
@@ -3916,282 +3914,6 @@ function stopActivityScroll() {
   if (_activityScrollTimer) { clearInterval(_activityScrollTimer); _activityScrollTimer = null; }
 }
 
-// ====== OCR 截图识别 ======
-var _ocrAccId = null;
-var _ocrCharId = null;
-var _ocrConfirmValues = null;
-var _ocrRawWords = [];
-var _ocrStream = null;
-var _ocrVideo = null;
-
-async function _ensureOcrStream() {
-  if (_ocrStream) {
-    var tracks = _ocrStream.getTracks();
-    if (tracks.length > 0 && tracks[0].readyState === 'live') return true;
-    _ocrStream = null;
-    _ocrVideo = null;
-  }
-  if (!(navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia)) {
-    showToast('当前浏览器不支持屏幕捕获，请使用PC浏览器');
-    return false;
-  }
-  try {
-    _ocrStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: 'never' }, audio: false });
-    _ocrStream.getVideoTracks()[0].addEventListener('ended', function() {
-      _ocrStream = null; _ocrVideo = null;
-    });
-    _ocrVideo = document.createElement('video');
-    _ocrVideo.srcObject = _ocrStream;
-    await new Promise(function(res) { _ocrVideo.onloadedmetadata = res; });
-    await _ocrVideo.play();
-    await new Promise(function(res) { setTimeout(res, 300); });
-    return true;
-  } catch (e) {
-    showToast('截图已取消');
-    _ocrStream = null; _ocrVideo = null;
-    return false;
-  }
-}
-
-function _captureFrame() {
-  if (!_ocrVideo || !_ocrStream) return null;
-  var vw = _ocrVideo.videoWidth, vh = _ocrVideo.videoHeight;
-  var maxW = 1920, scale = Math.min(1, maxW / vw);
-  var cw = Math.round(vw * scale), ch = Math.round(vh * scale);
-  var canvas = document.createElement('canvas');
-  canvas.width = cw; canvas.height = ch;
-  canvas.getContext('2d').drawImage(_ocrVideo, 0, 0, cw, ch);
-  return canvas.toDataURL('image/jpeg', 0.75);
-}
-
-function _stopOcrStream() {
-  if (_ocrStream) { _ocrStream.getTracks().forEach(function(t) { t.stop(); }); }
-  _ocrStream = null; _ocrVideo = null;
-}
-
-async function openOcrCapture(accId, charId) {
-  _ocrAccId = accId;
-  _ocrCharId = charId;
-  _ocrConfirmValues = null;
-  var ok = await _ensureOcrStream();
-  if (!ok) return;
-  var imageData = _captureFrame();
-  _stopOcrStream();
-  if (imageData) processOcrImage(imageData);
-}
-
-function ocrReselect() {
-  closeOcrModal();
-  var aId = _ocrAccId, cId = _ocrCharId;
-  if (aId && cId) { openOcrCapture(aId, cId); }
-  else if (selectedChar) { openOcrCapture(selectedChar.accId, selectedChar.charId); }
-}
-
-async function processOcrImage(imageDataUrl) {
-  showToast('正在识别截图...');
-  try {
-    var base64 = imageDataUrl.replace(/^data:image\/\w+;base64,/, '');
-    var res = await fetch('/api/ocr', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64 })
-    });
-    var data = await res.json();
-    if (data.error) {
-      showToast('OCR 服务错误: ' + data.error);
-      showOcrConfirmModal(imageDataUrl);
-      return;
-    }
-    var text = data.text || '';
-    console.log('[OCR raw text]', text);
-    console.log('[OCR words]', data.words, 'count:', data.count);
-    var parsed = parseOcrText(text);
-    console.log('[OCR parsed]', JSON.stringify(parsed));
-    _ocrRawWords = data.words || [];
-    _ocrConfirmValues = {
-      whiteEnergy: parsed.whiteEnergy !== undefined ? parsed.whiteEnergy : null,
-      blueEnergy: parsed.blueEnergy !== undefined ? parsed.blueEnergy : null,
-      kina: parsed.kina !== undefined ? parsed.kina : null,
-      combatPower: parsed.combatPower !== undefined ? parsed.combatPower : null,
-      itemLevel: parsed.itemLevel !== undefined ? parsed.itemLevel : null
-    };
-    var found = Object.keys(parsed).length;
-    showOcrConfirmModal(imageDataUrl);
-    showToast(found > 0 ? '识别完成，请确认数据' : '未识别到有效数据，可手动填写');
-  } catch (e) {
-    showToast('OCR请求失败: ' + e.message);
-    showOcrConfirmModal(imageDataUrl);
-  }
-}
-
-function showOcrConfirmModal(previewUrl) {
-  var overlay = document.getElementById('ocrModalOverlay');
-  var content = document.getElementById('ocrModalContent');
-  if (!overlay || !content) return;
-  var r = findChar(_ocrAccId, _ocrCharId);
-  var charName = r ? (r.ch.name || '未命名') : '';
-  content.innerHTML =
-    '<button class="ocr-modal-close" onclick="closeOcrModal()" title="关闭">\u00d7</button>' +
-    '<h3>截图识别 · ' + escapeHtml(charName) + '</h3>' +
-    (previewUrl ? '<img class="ocr-preview-img" src="' + previewUrl + '" alt="截图" style="max-height:160px;width:100%;object-fit:contain;border-radius:8px;margin-bottom:12px;border:1px solid var(--border);" />' : '') +
-    renderOcrConfirmPanel();
-  overlay.classList.add('show');
-  overlay.style.display = 'flex';
-}
-
-function closeOcrModal() {
-  _ocrAccId = null;
-  _ocrCharId = null;
-  _ocrConfirmValues = null;
-  _stopOcrStream();
-  var overlay = document.getElementById('ocrModalOverlay');
-  if (overlay) { overlay.classList.remove('show'); overlay.style.display = 'none'; }
-}
-
-function parseOcrText(text) {
-  var result = {};
-  var cleaned = text.replace(/[@＠]/g, ' ').replace(/[①②③④⑤⑥⑦⑧⑨⑩]+\d?/g, ' ');
-  var audeMatch = cleaned.match(/(\d{1,3})\s*\(\s*\+?\s*(\d[\d,]*)\s*[/)+\s]+(\d{2,4})/);
-  if (audeMatch) {
-    var w = parseInt(audeMatch[1], 10);
-    var b = parseInt(audeMatch[2].replace(/,/g, ''), 10);
-    var cap = parseInt(audeMatch[3], 10);
-    if (cap === 840 || cap <= 1000) {
-      if (w > cap) {
-        var ws = String(w);
-        w = parseInt(ws.substring(ws.length - (String(cap).length)), 10);
-      }
-      result.whiteEnergy = Math.min(w, cap);
-      result.blueEnergy = Math.min(b, 2000);
-    }
-  }
-  var kinahMatches = cleaned.match(/\d{1,3}(?:,\d{3}){2,}/g);
-  if (kinahMatches) {
-    var kinahs = kinahMatches.map(function(k) { return parseInt(k.replace(/,/g, ''), 10); });
-    kinahs = kinahs.filter(function(n) { return n >= 1000000 && n <= 999999999999; });
-    kinahs.sort(function(a, b) { return b - a; });
-    if (kinahs.length > 0) result.kina = kinahs[0];
-  }
-  var cpMatch = cleaned.match(/(\d[\d,.]*)\s*[Kk](?![mM])/);
-  if (cpMatch) {
-    var val = parseFloat(cpMatch[1].replace(/,/g, ''));
-    if (val >= 10) result.combatPower = Math.min(Math.round(val * 10) / 10, 9999);
-  }
-  return result;
-}
-
-function getOcrCurrentValues() {
-  var r = findChar(_ocrAccId, _ocrCharId);
-  if (!r) return {};
-  var ch = r.ch;
-  var energy = calcWhiteEnergy(r.acc, ch);
-  return {
-    whiteEnergy: Math.floor(energy.displayEnergy),
-    blueEnergy: ch.blueEnergy || 0,
-    kina: (ch.kina === null || ch.kina === undefined) ? null : ch.kina,
-    combatPower: (ch.combatPower === null || ch.combatPower === undefined) ? null : ch.combatPower,
-    itemLevel: (ch.itemLevel === null || ch.itemLevel === undefined) ? null : ch.itemLevel
-  };
-}
-
-function ocrFmtVal(key, val) {
-  if (val === null || val === undefined || val === '') return '—';
-  if (key === 'kina') return formatKina(val);
-  if (key === 'combatPower') return val + 'K';
-  return String(val);
-}
-
-function renderOcrConfirmPanel() {
-  var cur = getOcrCurrentValues();
-  var fields = [
-    { key: 'whiteEnergy', label: '白奥德' },
-    { key: 'blueEnergy', label: '蓝奥德' },
-    { key: 'kina', label: '基纳' },
-    { key: 'combatPower', label: '战力' },
-    { key: 'itemLevel', label: '装等' }
-  ];
-  var cv = _ocrConfirmValues || {};
-  var rows = fields.map(function(f) {
-    var detected = cv[f.key];
-    var current = cur[f.key];
-    var hasDetected = detected !== null && detected !== undefined;
-    var sameAsCurrent = hasDetected && String(detected) === String(current === null ? '' : current);
-    var changed = hasDetected && !sameAsCurrent;
-    var inputVal = changed ? detected : '';
-    var placeholder = hasDetected ? '无变化' : '未识别';
-    return '<div class="ocr-field-row">' +
-      '<span class="ocr-field-label">' + f.label + '</span>' +
-      '<span class="ocr-field-val">' + ocrFmtVal(f.key, current) + '</span>' +
-      '<input class="ocr-field-input' + (changed ? ' changed' : '') + '" type="text" data-ocr-key="' + f.key + '" value="' + (changed ? escapeHtml(String(inputVal)) : '') + '" placeholder="' + placeholder + '" />' +
-    '</div>';
-  }).join('');
-  return '<div class="ocr-confirm-panel" id="ocrConfirmPanel">' +
-    '<div class="ocr-field-row header"><span>字段</span><span>当前值</span><span>识别值（可编辑）</span></div>' +
-    rows +
-    '<div class="ocr-confirm-actions">' +
-      '<button class="ocr-action-btn" onclick="closeOcrModal()">取消</button>' +
-      '<button class="ocr-action-btn" onclick="ocrRetake()">重新截图</button>' +
-      '<button class="ocr-action-btn primary" onclick="applyOcrResults()">确认应用</button>' +
-    '</div>' +
-  '</div>';
-}
-
-async function ocrRetake() {
-  var aId = _ocrAccId, cId = _ocrCharId;
-  closeOcrModal();
-  if (aId && cId) { openOcrCapture(aId, cId); }
-  else if (selectedChar) { openOcrCapture(selectedChar.accId, selectedChar.charId); }
-}
-
-function applyOcrResults() {
-  var r = findChar(_ocrAccId, _ocrCharId);
-  if (!r) return;
-  var panel = document.getElementById('ocrConfirmPanel');
-  if (!panel) return;
-  var inputs = panel.querySelectorAll('.ocr-field-input');
-  var values = {};
-  inputs.forEach(function(inp) {
-    var key = inp.getAttribute('data-ocr-key');
-    var raw = inp.value.trim();
-    if (raw === '') return;
-    if (key === 'kina') {
-      values[key] = parseKinaVal(raw);
-    } else if (key === 'combatPower') {
-      var n = parseFloat(raw.replace(/,/g, ''));
-      values[key] = (isNaN(n) || n <= 0) ? null : Math.min(Math.round(n * 10) / 10, 9999);
-    } else {
-      var n2 = parseInt(raw.replace(/,/g, ''), 10);
-      if (!isNaN(n2)) values[key] = n2;
-    }
-  });
-  if (Object.keys(values).length === 0) {
-    showToast('没有可应用的数据');
-    return;
-  }
-  pushUndo();
-  var ch = r.ch;
-  if (values.whiteEnergy !== undefined) {
-    ch.whiteEnergy = Math.max(0, Math.min(WHITE_CAP, values.whiteEnergy));
-    ch.whiteTimestamp = new Date().toISOString();
-  }
-  if (values.blueEnergy !== undefined) {
-    ch.blueEnergy = Math.max(0, Math.min(BLUE_CAP, values.blueEnergy));
-  }
-  if (values.kina !== undefined) {
-    ch.kina = values.kina;
-  }
-  if (values.combatPower !== undefined) {
-    ch.combatPower = values.combatPower;
-  }
-  if (values.itemLevel !== undefined) {
-    ch.itemLevel = (values.itemLevel <= 0) ? null : Math.min(values.itemLevel, 9999);
-  }
-  saveData();
-  render();
-  closeOcrModal();
-  showToast('数据已应用');
-}
-
 // ====== Init ======
 loadData();
 render();
@@ -4201,5 +3923,6 @@ setInterval(function() { renderTodayActivities(); }, 60000);
 setInterval(updateRecoveryDisplay, 30000);
 syncOnLoad();
 </script>
+<script src="/capture-client.js"></script>
 </body>
 </html>

@@ -5,3 +5,12 @@ node_modules/
 package.json
 package-lock.json
 .dev.vars
+collector/build/
+collector/dist/
+collector/runtime/
+collector/release/
+collector/debug-*/
+collector/*.spec
+collector/__pycache__/
+._*
+**/._*
