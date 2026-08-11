@@ -1777,7 +1777,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag">V1.3.1</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.2</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -3515,8 +3515,18 @@ function saveKinaAndClose() {
 // ====== 云同步 ======
 const SYNC_API = '/api/sync';
 const SYNC_PASSPHRASE_KEY = 'aion2_sync_passphrase';
+const SYNC_BASE_REVISION_KEY = 'aion2_sync_base_revision';
 let syncDebounceTimer = null;
 let _syncCloudCache = null;
+
+function getSyncBaseRevision() {
+  return localStorage.getItem(SYNC_BASE_REVISION_KEY) || null;
+}
+
+function setSyncBaseRevision(revision) {
+  if (revision) localStorage.setItem(SYNC_BASE_REVISION_KEY, revision);
+  else localStorage.removeItem(SYNC_BASE_REVISION_KEY);
+}
 
 function _sha256Sync(str) {
   var K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
@@ -3627,6 +3637,8 @@ async function confirmSyncPassphrase() {
     return;
   }
   localStorage.setItem(SYNC_PASSPHRASE_KEY, passphrase);
+  setSyncBaseRevision(null);
+  localStorage.removeItem('aion2_capture_last_event');
   closeSyncModal();
   showToast('同步口令已设置');
   _isFirstSync = true;
@@ -3636,6 +3648,8 @@ async function confirmSyncPassphrase() {
 
 function changeSyncPassphrase() {
   localStorage.removeItem(SYNC_PASSPHRASE_KEY);
+  setSyncBaseRevision(null);
+  localStorage.removeItem('aion2_capture_last_event');
   updateSyncStatus('off');
   openSyncModal();
 }
@@ -3643,39 +3657,54 @@ function changeSyncPassphrase() {
 function clearSyncPassphrase() {
   if (!confirm('清除口令后将停止云同步，确定继续？')) return;
   localStorage.removeItem(SYNC_PASSPHRASE_KEY);
+  setSyncBaseRevision(null);
+  localStorage.removeItem('aion2_capture_last_event');
   updateSyncStatus('off');
   closeSyncModal();
   showToast('同步口令已清除');
 }
 
-async function syncPush() {
+async function syncPush(force) {
   var passphrase = getSyncPassphrase();
-  if (!passphrase || location.protocol === 'file:') return;
+  if (!passphrase || location.protocol === 'file:') return false;
   try {
     updateSyncStatus('syncing');
     var token = await hashPassphrase(passphrase);
-    var payload = JSON.stringify({
+    var payloadData = {
       data: DATA,
       lastModified: DATA._lastModified || new Date().toISOString(),
       exists: true
-    });
+    };
+    var baseRevision = getSyncBaseRevision();
+    if (!force && baseRevision) payloadData.baseLastModified = baseRevision;
+    var payload = JSON.stringify(payloadData);
     var res = await fetch(SYNC_API, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', 'X-Sync-Token': token },
       body: payload
     });
+    if (res.status === 409) {
+      updateSyncStatus('error');
+      return false;
+    }
     updateSyncStatus(res.ok ? 'synced' : 'error');
+    if (res.ok) setSyncBaseRevision(payloadData.lastModified);
+    return res.ok;
   } catch(e) {
     console.error('Sync push error:', e);
     updateSyncStatus('error');
     showToast('推送出错: ' + (e.message || e));
+    return false;
   }
 }
 
 function debouncedSyncPush() {
   if (!getSyncPassphrase() || location.protocol === 'file:') return;
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
-  syncDebounceTimer = setTimeout(function() { syncPush(); }, 2000);
+  syncDebounceTimer = setTimeout(async function() {
+    syncDebounceTimer = null;
+    if (!(await syncPush())) await syncOnLoad();
+  }, 2000);
 }
 
 async function syncPull() {
@@ -3697,11 +3726,11 @@ async function manualSyncPull() {
 
 async function manualSyncPush() {
   closeSyncModal();
-  await syncPush();
-  if (document.querySelector('.tool-btn.sync') && document.querySelector('.tool-btn.sync').classList.contains('error')) {
-    showToast('推送失败，请检查网络');
-  } else {
+  if (await syncPush()) {
     showToast('数据已推送到云端');
+  } else {
+    showToast('云端已有更新，请先确认保留哪一份数据');
+    await syncOnLoad();
   }
 }
 
@@ -3736,8 +3765,25 @@ async function syncOnLoad() {
     var localMod = DATA._lastModified;
     var cloudMod = cloud.lastModified;
     if (localMod && localMod === cloudMod) {
+      setSyncBaseRevision(cloudMod);
       updateSyncStatus('synced');
       return;
+    }
+    var baseMod = getSyncBaseRevision();
+    if (baseMod) {
+      var localChanged = localMod !== baseMod;
+      var cloudChanged = cloudMod !== baseMod;
+      if (!localChanged && cloudChanged) {
+        applyCloudSyncData(cloud.data, cloudMod);
+        showToast('已自动接收采集助手的云端更新');
+        return;
+      }
+      if (localChanged && !cloudChanged) {
+        var pushed = await syncPush();
+        if (pushed) return;
+        cloud = await syncPull();
+        cloudMod = cloud && cloud.lastModified;
+      }
     }
     showSyncConflictDialog(localMod, cloudMod, cloud.data, _isFirstSync);
   } catch(e) {
@@ -3745,6 +3791,27 @@ async function syncOnLoad() {
     updateSyncStatus('error');
     showToast('同步出错: ' + (e.message || e));
   }
+}
+
+function applyCloudSyncData(cloudData, cloudMod) {
+  if (!cloudData) return false;
+  if (syncDebounceTimer) {
+    clearTimeout(syncDebounceTimer);
+    syncDebounceTimer = null;
+  }
+  if (cloudData.accounts) cloudData.accounts.forEach(ensureAccDefaults);
+  DATA = cloudData;
+  DATA._lastModified = cloudMod;
+  dungeonCostHigh = DATA._dungeonCostHigh || false;
+  undoStack = [];
+  undoMetaStack = [];
+  charEnergyUndoStacks = {};
+  selectedChar = null;
+  localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
+  setSyncBaseRevision(cloudMod);
+  render();
+  updateSyncStatus('synced');
+  return true;
 }
 
 function showSyncConflictDialog(localMod, cloudMod, cloudData, isFirstSync) {
@@ -3782,6 +3849,8 @@ function showSyncConflictDialog(localMod, cloudMod, cloudData, isFirstSync) {
 async function resolveConflict(choice) {
   if (choice === 'change') {
     localStorage.removeItem(SYNC_PASSPHRASE_KEY);
+    setSyncBaseRevision(null);
+    localStorage.removeItem('aion2_capture_last_event');
     updateSyncStatus('off');
     _syncCloudCache = null;
     openSyncModal();
@@ -3789,21 +3858,10 @@ async function resolveConflict(choice) {
   }
   closeSyncModal();
   if (choice === 'local') {
-    await syncPush();
-    showToast('已使用本地数据覆盖云端');
+    if (await syncPush(true)) showToast('已使用本地数据覆盖云端');
+    else showToast('本地数据覆盖失败，请稍后重试');
   } else if (_syncCloudCache && _syncCloudCache.data) {
-    var cd = _syncCloudCache.data;
-    if (cd.accounts) cd.accounts.forEach(ensureAccDefaults);
-    DATA = cd;
-    DATA._lastModified = _syncCloudCache.modified;
-    dungeonCostHigh = DATA._dungeonCostHigh || false;
-    undoStack = [];
-    undoMetaStack = [];
-    charEnergyUndoStacks = {};
-    selectedChar = null;
-    localStorage.setItem('aion2_aion_tracker_v2', JSON.stringify(DATA));
-    render();
-    updateSyncStatus('synced');
+    applyCloudSyncData(_syncCloudCache.data, _syncCloudCache.modified);
     showToast('已使用云端数据');
   }
   _syncCloudCache = null;
@@ -3921,8 +3979,13 @@ checkMembershipAlert();
 loadActivities();
 setInterval(function() { renderTodayActivities(); }, 60000);
 setInterval(updateRecoveryDisplay, 30000);
-syncOnLoad();
 </script>
 <script src="/capture-client.js"></script>
+<script>
+if (location.hostname === 'test.buyali.xyz') {
+  const versionTag = document.getElementById('appVersionTag');
+  if (versionTag) versionTag.textContent = 'V1.3.2-test';
+}
+</script>
 </body>
 </html>

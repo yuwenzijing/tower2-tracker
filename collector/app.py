@@ -23,8 +23,10 @@ from rapidocr_onnxruntime import RapidOCR
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.1"
-API_BASE = os.environ.get("BUYALI_API_BASE", "https://buyali.xyz").rstrip("/")
+APP_VERSION = "1.3.2"
+IS_TEST_BUILD = "-test" in APP_VERSION
+DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
+API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
 CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "BuyaliCollector"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 FIELD_LABELS = {"whiteEnergy": "白奥德", "blueEnergy": "蓝奥德", "combatPower": "战斗力", "itemLevel": "道具等级", "kina": "基纳"}
@@ -121,7 +123,7 @@ class ApiClient:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) BuyaliCollector/1.3.1",
+            "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) BuyaliCollector/{APP_VERSION}",
         }
         if authenticated:
             token = self.config.get("deviceToken")
@@ -367,6 +369,61 @@ def compact_number(text: str):
     return int(round(value))
 
 
+def parse_aether_candidates(lines: list[tuple[str, float]]) -> tuple[dict, dict]:
+    """Parse Aether without treating a visible zero as a missing value.
+
+    OCR engines sometimes split ``285(+0)/840`` into several adjacent lines.
+    Try each line first, then short ordered joins. A field is returned only
+    when its syntax is present; the numeric value zero remains valid.
+    """
+    normalized = [(re.sub(r"\s+", "", text).replace(".", ","), confidence) for text, confidence in lines]
+    candidates = list(normalized)
+    for start in range(len(normalized)):
+        for size in (2, 3):
+            group = normalized[start:start + size]
+            if len(group) == size:
+                candidates.append(("".join(item[0] for item in group), min(item[1] for item in group)))
+
+    fields, scores = {}, {}
+    for compact, confidence in candidates:
+        match = re.search(r"(?<!\d)(\d{1,3})\(?\+([\d,]{1,6})\)?/840", compact)
+        if match:
+            white, blue = integer(match.group(1)), integer(match.group(2))
+            if white is not None and blue is not None and 0 <= white <= 840 and 0 <= blue <= 2000:
+                score = min(99, confidence * 100)
+                return {"whiteEnergy": white, "blueEnergy": blue}, {"whiteEnergy": score, "blueEnergy": score}
+    for compact, confidence in candidates:
+        match = re.search(r"(?<!\d)(\d{1,3})/840(?:[^0-9]|$)", compact)
+        if match:
+            white = integer(match.group(1))
+            if white is not None and 0 <= white <= 840:
+                fields["whiteEnergy"] = white
+                scores["whiteEnergy"] = min(99, confidence * 100)
+                break
+    return fields, scores
+
+
+def parse_currency_candidates(lines: list[tuple[str, float]], has_aether: bool) -> tuple[int, float] | None:
+    """Select kina by UI order while retaining standalone ``0`` counters."""
+    values = []
+    for text, confidence in lines:
+        compact = re.sub(r"\s+", "", text)
+        if "/840" in compact or re.search(r"[+()]", compact):
+            continue
+        # A standalone zero is a real counter. Reject short non-zero values,
+        # which are normally level/badge noise in the same top strip.
+        if re.fullmatch(r"0", compact):
+            values.append((0, confidence))
+        elif re.fullmatch(r"\d{1,3}(?:,\d{3})+", compact):
+            value = integer(compact)
+            if value is not None and value <= 999_999_999_999:
+                values.append((value, confidence))
+    if len(values) < 2:
+        return None
+    index = -2 if has_aether else (-3 if len(values) >= 4 else -2)
+    return values[index]
+
+
 def recognize_top_status_bar(image: Image.Image) -> tuple[dict, dict]:
     """Recognize menu counters by their semantic format and order.
 
@@ -470,40 +527,13 @@ def recognize(image: Image.Image) -> tuple[dict, dict]:
     # Both the normal HUD and menu screens keep resource counters in the top
     # 7.5% strip; their horizontal position changes, so read the entire strip.
     top_lines = rapid_read(crop_ratio(image, (0.0, 0.0, 0.98, 0.075)), target_height=260)
-    for text, confidence in top_lines:
-        compact = re.sub(r"\s+", "", text).replace(".", ",")
-        match = re.search(r"(?<!\d)(\d{1,3})\(?\+([\d,]{1,6})\)?/840", compact)
-        if match:
-            white, blue = integer(match.group(1)), integer(match.group(2))
-            if white is not None and blue is not None and 0 <= white <= 840 and 0 <= blue <= 2000:
-                fields.update(whiteEnergy=white, blueEnergy=blue)
-                score = min(99, confidence * 100)
-                scores.update(whiteEnergy=score, blueEnergy=score)
-                break
-        match = re.fullmatch(r"(\d{1,3})/840", compact)
-        if match and "whiteEnergy" not in fields:
-            white = integer(match.group(1))
-            if white is not None and 0 <= white <= 840:
-                fields["whiteEnergy"] = white
-                scores["whiteEnergy"] = min(99, confidence * 100)
+    aether_fields, aether_scores = parse_aether_candidates(top_lines)
+    fields.update(aether_fields)
+    scores.update(aether_scores)
 
-    currencies = []
-    for text, confidence in top_lines:
-        clean = text.strip().replace(".", ",")
-        if re.fullmatch(r"\d{1,3}(?:,\d{3})+", clean):
-            value = integer(clean)
-            if value is not None and value <= 999_999_999_999:
-                currencies.append((value, confidence))
-    if len(currencies) >= 2:
-        # Menu layouts end with [kina, bound-gold], while the normal HUD adds
-        # another star currency after them. A visible /840 counter identifies
-        # the menu layout. In the HUD, use the third item from the end only
-        # when that extra counter was actually recognized.
-        if "whiteEnergy" in fields:
-            target_index = -2
-        else:
-            target_index = -3 if len(currencies) >= 4 else -2
-        value, confidence = currencies[target_index]
+    currency = parse_currency_candidates(top_lines, "whiteEnergy" in fields)
+    if currency is not None:
+        value, confidence = currency
         fields["kina"], scores["kina"] = value, min(99, confidence * 100)
 
     # Center-bottom stat plaque: K suffix unambiguously means combat power;
@@ -876,7 +906,7 @@ class CollectorApp:
 
 if __name__ == "__main__":
     kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.1")
+    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.2")
     if kernel32.GetLastError() == 183:
         user32.MessageBoxW(None, "数据采集助手已经在运行。", APP_NAME, 0x40)
         sys.exit(0)

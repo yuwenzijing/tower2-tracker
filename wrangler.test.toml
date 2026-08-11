@@ -1,0 +1,12 @@
+name = "tower2-tracker-test"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+routes = [{ pattern = "test.buyali.xyz", custom_domain = true }]
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[kv_namespaces]]
+binding = "SYNC_KV"
+id = "f1558a21182b4b4e9b40268fabce28f2"

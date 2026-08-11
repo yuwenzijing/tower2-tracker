@@ -24,8 +24,18 @@ async function handleSync(request, env) {
   }
   if (request.method === 'PUT') {
     const body = await request.text();
-    try { JSON.parse(body); } catch (_) { return json({ error: 'Invalid JSON' }, 400); }
-    await env.SYNC_KV.put(token, body, { expirationTtl: SYNC_TTL });
+    let incoming;
+    try { incoming = JSON.parse(body); } catch (_) { return json({ error: 'Invalid JSON' }, 400); }
+    const current = await env.SYNC_KV.get(token, 'json');
+    const baseLastModified = incoming && incoming.baseLastModified;
+    if (baseLastModified && current && current.lastModified !== baseLastModified) {
+      return json({
+        error: 'SYNC_CONFLICT',
+        cloudLastModified: current.lastModified || null
+      }, 409);
+    }
+    if (incoming && typeof incoming === 'object') delete incoming.baseLastModified;
+    await env.SYNC_KV.put(token, JSON.stringify(incoming), { expirationTtl: SYNC_TTL });
     return json({ success: true });
   }
   return json({ error: 'Method not allowed' }, 405);
@@ -96,6 +106,7 @@ async function deviceState(env, device) {
     characters: (account.characters || []).map(character => ({
       id: character.id,
       name: character.name,
+      charClass: character.charClass || '',
       whiteEnergy: character.whiteEnergy || 0,
       whiteEnergyDisplay: effectiveWhiteEnergy(account, character),
       whiteTimestamp: character.whiteTimestamp || null,

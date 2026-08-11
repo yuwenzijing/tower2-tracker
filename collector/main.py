@@ -3,21 +3,27 @@ from __future__ import annotations
 import ctypes
 import ctypes.wintypes
 import hashlib
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import threading
+import time
 import tkinter as tk
+import zipfile
 from tkinter import ttk
+from urllib.request import Request, urlopen
 import pystray
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageTk
 from pathlib import Path
 
 from app import (
     API_BASE,
     APP_NAME,
     APP_VERSION,
+    IS_TEST_BUILD,
     FIELD_LABELS,
     ApiClient,
     ApiError,
@@ -49,6 +55,15 @@ PURPLE_HOVER = "#687bec"
 RED = "#ff6b78"
 AMBER = "#f4b95f"
 FONT = "Microsoft YaHei UI"
+CLASS_LABELS = {
+    "sword": "剑星", "guardian": "守护星", "chanter": "护法星", "cleric": "治愈星",
+    "ranger": "弓星", "sorcerer": "魔道星", "spirit": "精灵星", "assassin": "杀星", "fighter": "拳星",
+}
+
+
+def resource_path(relative: str) -> Path:
+    root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return root / relative
 
 HWND_TOPMOST = -1
 SWP_NOSIZE = 0x0001
@@ -59,8 +74,13 @@ GWL_EXSTYLE = -20
 GWLP_HWNDPARENT = -8
 WS_EX_TOOLWINDOW = 0x00000080
 WS_EX_APPWINDOW = 0x00040000
-OVERLAY_WIDTH = 168
+OVERLAY_WIDTH = 52
 OVERLAY_HEIGHT = 52
+UPDATE_API = (
+    "https://api.github.com/repos/yuwenzijing/tower2-tracker/releases/tags/v1.3.2-test.1"
+    if IS_TEST_BUILD
+    else "https://api.github.com/repos/yuwenzijing/tower2-tracker/releases/latest"
+)
 
 user32.GetAncestor.argtypes = [ctypes.wintypes.HWND, ctypes.c_uint]
 user32.GetAncestor.restype = ctypes.wintypes.HWND
@@ -93,6 +113,27 @@ def relaunch_from_ascii_runtime() -> bool:
     environment = os.environ.copy()
     environment["BUYALI_PORTABLE_ROOT"] = str(portable_root)
     subprocess.Popen([str(target)], cwd=str(cache), env=environment)
+    return True
+
+
+def apply_update_mode() -> bool:
+    """Run from a temporary copy so the installed onedir can be replaced."""
+    if len(sys.argv) < 5 or sys.argv[1] != "--apply-update":
+        return False
+    staging, target, owner_pid = Path(sys.argv[2]), Path(sys.argv[3]), int(sys.argv[4])
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(0x00100000, False, owner_pid)
+    if handle:
+        kernel32.WaitForSingleObject(handle, 30000)
+        kernel32.CloseHandle(handle)
+    for attempt in range(20):
+        try:
+            shutil.copytree(staging, target, dirs_exist_ok=True)
+            executable = target / "BuyaliCollector.exe"
+            subprocess.Popen([str(executable)], cwd=str(target))
+            return True
+        except OSError:
+            time.sleep(0.5 + attempt * 0.1)
     return True
 
 
@@ -141,17 +182,25 @@ class CollectorApp:
         self.offset = self.config.get("offset", [20, 180])
         if not isinstance(self.offset, list) or len(self.offset) != 2:
             self.offset = [20, 180]
+        self.config.pop("hoverDelaySeconds", None)
+        self.config.setdefault("sameAccountOnly", False)
+        self.info_panel = None
+        self.info_settings_panel = None
+        self.info_images = []
+        self.cached_state = None
+        self.cached_state_at = 0.0
 
         # A normal root window owns the taskbar entry. It never participates in
         # screenshots or overlay visibility, so the process remains manageable.
         self.root = tk.Tk()
         self.root.title(f"{APP_NAME} {APP_VERSION}")
-        self.root.geometry("520x455")
-        self.root.minsize(500, 430)
+        self.root.geometry("440x430")
+        self.root.minsize(420, 410)
         self.root.configure(bg=BG)
         self.root.protocol("WM_DELETE_WINDOW", self.root.iconify)
         self._build_control_panel()
         self._build_tray()
+        self.root.after_idle(self.fit_control_panel)
 
         # The overlay is an independent native top-level window.
         # One Tcl event loop owns every UI window. Native ownership is removed
@@ -159,19 +208,23 @@ class CollectorApp:
         self.overlay = tk.Toplevel(self.root)
         self.overlay.overrideredirect(True)
         self.overlay.attributes("-topmost", True)
-        self.overlay.configure(bg=CYAN)
+        try:
+            self.overlay.attributes("-transparentcolor", BG)
+        except tk.TclError:
+            pass
+        self.overlay.configure(bg=BG)
         self.overlay.geometry(f"{OVERLAY_WIDTH}x{OVERLAY_HEIGHT}+20+180")
         self.capture_button = tk.Button(
-            self.overlay, text="◎  采集数据", command=self.capture, bg=PANEL,
-            fg=TEXT, activebackground=PANEL_2, activeforeground=CYAN,
-            relief="flat", bd=0, font=(FONT, 11, "bold"), cursor="hand2",
+            self.overlay, text="📷", command=self.capture, bg=BG,
+            fg=CYAN, activebackground=BG, activeforeground=GREEN,
+            relief="flat", bd=0, font=("Segoe UI Emoji", 25), cursor="hand2",
         )
         self.capture_button.pack(fill="both", expand=True, padx=2, pady=2)
         for widget in (self.overlay, self.capture_button):
             widget.bind("<ButtonPress-1>", self.drag_start, add="+")
             widget.bind("<B1-Motion>", self.drag_move, add="+")
             widget.bind("<ButtonRelease-1>", self.drag_end, add="+")
-            widget.bind("<Button-3>", self.show_control_panel)
+            widget.bind("<Button-3>", self.toggle_info_panel)
 
         self.root.update_idletasks()
         self.overlay.update_idletasks()
@@ -190,13 +243,15 @@ class CollectorApp:
             self.root.after(600, self.verify_pairing)
         else:
             self.root.after(600, self.pair)
+        self.root.after(1600, self.check_for_updates)
 
     def _build_control_panel(self):
         header = tk.Frame(self.root, bg=BG)
         header.pack(fill="x", padx=24, pady=(22, 12))
         tk.Label(header, text="BUYALI", bg=BG, fg=CYAN, font=(FONT, 10, "bold")).pack(anchor="w")
         tk.Label(header, text="数据采集助手", bg=BG, fg=TEXT, font=(FONT, 18, "bold")).pack(anchor="w", pady=(2, 0))
-        tk.Label(header, text=f"正式版 · {APP_VERSION}", bg=BG, fg=MUTED, font=(FONT, 9)).pack(anchor="w", pady=(4, 0))
+        environment_name = "测试环境" if IS_TEST_BUILD else "正式环境"
+        tk.Label(header, text=f"{environment_name} · {APP_VERSION}", bg=BG, fg=MUTED, font=(FONT, 9)).pack(anchor="w", pady=(4, 0))
 
         card = tk.Frame(self.root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
         card.pack(fill="x", padx=24, pady=8)
@@ -218,14 +273,36 @@ class CollectorApp:
         button(actions, "重新绑定", self.rebind, width=16).grid(row=0, column=1, sticky="ew", padx=5, pady=5)
         self.cancel_button = button(actions, "取消当前采集", self.cancel_capture, danger=True, width=16)
         self.cancel_button.grid(row=1, column=0, columnspan=2, sticky="ew", padx=5, pady=5)
-        tk.Label(self.root, text="更多操作：任务栏右下角 BUYALI 图标右键菜单", bg=BG, fg=MUTED, font=(FONT, 9)).pack(pady=(2, 8))
+        settings = tk.Frame(self.root, bg=PANEL, highlightbackground=BORDER, highlightthickness=1)
+        settings.pack(fill="x", padx=24, pady=(10, 4))
+        tk.Label(settings, text="悬浮信息", bg=PANEL, fg=TEXT, font=(FONT, 10, "bold")).pack(anchor="w", padx=14, pady=(10, 3))
+        self.same_account_var = tk.BooleanVar(value=bool(self.config.get("sameAccountOnly")))
+        tk.Checkbutton(
+            settings, text="只显示同账号角色", variable=self.same_account_var,
+            command=self.save_settings, bg=PANEL, fg=TEXT, selectcolor=PANEL_2,
+            activebackground=PANEL, activeforeground=TEXT, font=(FONT, 9),
+        ).pack(anchor="w", padx=12, pady=(2, 1))
+        tk.Label(settings, text="仅显示与当前游戏角色属于同一账号的角色", bg=PANEL, fg=MUTED, font=(FONT, 8)).pack(anchor="w", padx=31, pady=(0, 10))
+        self.update_status_label = tk.Label(settings, text="自动更新：检查中", bg=PANEL, fg=MUTED, font=(FONT, 8), anchor="w")
+        self.update_status_label.pack(fill="x", padx=14, pady=(0, 10))
+
+    def fit_control_panel(self):
+        self.root.update_idletasks()
+        required_width = max(440, self.root.winfo_reqwidth())
+        required_height = max(430, self.root.winfo_reqheight())
+        left, top, right, bottom = work_area_for_point(self.root.winfo_x(), self.root.winfo_y())
+        width = min(required_width, right - left - 24)
+        height = min(required_height, bottom - top - 24)
+        self.root.geometry(f"{width}x{height}")
 
     def _build_tray(self):
-        image = Image.new("RGBA", (64, 64), BG)
+        image = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
         draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle((5, 5, 59, 59), radius=14, fill=PANEL, outline=CYAN, width=4)
-        draw.ellipse((22, 18, 42, 38), fill=CYAN)
-        draw.rectangle((29, 35, 35, 52), fill=CYAN)
+        draw.rounded_rectangle((8, 19, 56, 51), radius=8, fill=CYAN)
+        draw.polygon(((17, 19), (24, 10), (39, 10), (46, 19)), fill=CYAN)
+        draw.ellipse((23, 23, 43, 43), fill=BG)
+        draw.ellipse((28, 28, 38, 38), fill=CYAN)
+        draw.ellipse((48, 47, 60, 59), fill=GREEN)
         call = lambda fn: (lambda _icon=None, _item=None: self.root.after(0, fn))
         menu = pystray.Menu(
             pystray.MenuItem("显示控制面板", call(self.show_control_panel), default=True),
@@ -238,6 +315,248 @@ class CollectorApp:
         )
         self.tray = pystray.Icon("BuyaliCollector", image, "Buyali 数据采集助手", menu)
         self.tray.run_detached()
+
+    def save_settings(self):
+        self.config["sameAccountOnly"] = bool(self.same_account_var.get())
+        save_config(self.config)
+
+    @staticmethod
+    def version_tuple(value):
+        numbers = re.findall(r"\d+", str(value))
+        return tuple(int(item) for item in numbers[:3]) or (0,)
+
+    def check_for_updates(self):
+        def worker():
+            try:
+                request = Request(UPDATE_API, headers={"Accept": "application/vnd.github+json", "User-Agent": f"BuyaliCollector/{APP_VERSION}"})
+                with urlopen(request, timeout=8) as response:
+                    release = json.loads(response.read().decode("utf-8"))
+                latest = str(release.get("tag_name", "")).lstrip("vV")
+                if latest and self.version_tuple(latest) > self.version_tuple(APP_VERSION):
+                    assets = release.get("assets") or []
+                    asset = next((item for item in assets if str(item.get("name", "")).lower().endswith(".zip") and "buyalicollector" in str(item.get("name", "")).lower()), None)
+                    if not asset:
+                        raise RuntimeError("新版本缺少 Windows 更新包")
+                    update_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "BuyaliCollector" / "updates" / latest
+                    archive = update_dir / str(asset["name"])
+                    staging = update_dir / "staging"
+                    if not (staging / "BuyaliCollector.exe").exists():
+                        update_dir.mkdir(parents=True, exist_ok=True)
+                        request = Request(str(asset["browser_download_url"]), headers={"User-Agent": f"BuyaliCollector/{APP_VERSION}"})
+                        with urlopen(request, timeout=45) as response, archive.open("wb") as output:
+                            shutil.copyfileobj(response, output)
+                        if staging.exists(): shutil.rmtree(staging)
+                        with zipfile.ZipFile(archive) as package:
+                            package.extractall(staging)
+                        roots = list(staging.rglob("BuyaliCollector.exe"))
+                        if not roots:
+                            raise RuntimeError("更新包结构无效")
+                        source_root = roots[0].parent
+                        if source_root != staging:
+                            normalized = update_dir / "normalized"
+                            if normalized.exists(): shutil.rmtree(normalized)
+                            shutil.copytree(source_root, normalized)
+                            shutil.rmtree(staging); normalized.rename(staging)
+                    self.config["pendingUpdate"] = {"version": latest, "path": str(staging)}
+                    save_config(self.config)
+                    self.root.after(0, lambda: self.update_ready(latest, staging))
+                else:
+                    self.root.after(0, lambda: self.update_status_label.config(text="自动更新：已是最新版本", fg=GREEN))
+            except Exception:
+                self.root.after(0, lambda: self.update_status_label.config(text="自动更新：暂时无法检查", fg=MUTED))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def update_ready(self, version, staging):
+        self.update_status_label.config(text=f"更新 {version} 已下载，等待重启", fg=GREEN)
+        dialog, body = self.make_dialog("发现新版本", 380, 250)
+        tk.Label(body, text=f"V{version} 已自动下载", bg=BG, fg=CYAN, font=(FONT, 13, "bold")).pack(anchor="w")
+        tk.Label(body, text="可立即重启完成更新；稍后重启不影响当前版本使用。", bg=BG, fg=MUTED, font=(FONT, 9), wraplength=310, justify="left").pack(fill="x", pady=18)
+        controls = tk.Frame(body, bg=BG); controls.pack(fill="x", pady=(10, 0))
+        controls.columnconfigure(0, weight=1); controls.columnconfigure(1, weight=1)
+        button(controls, "立即重启更新", lambda: self.restart_for_update(staging), primary=True).grid(row=0, column=0, sticky="ew", padx=(0, 5))
+        button(controls, "稍后重启", dialog.destroy).grid(row=0, column=1, sticky="ew", padx=(5, 0))
+
+    def restart_for_update(self, staging):
+        if not getattr(sys, "frozen", False):
+            self.notice("测试运行模式", "源码运行时不会覆盖本地文件；安装包内可正常重启更新。")
+            return
+        current_dir = Path(sys.executable).resolve().parent
+        helper_dir = Path(os.environ.get("TEMP", Path.home())) / "BuyaliCollector" / "updater-runtime"
+        if helper_dir.exists(): shutil.rmtree(helper_dir)
+        shutil.copytree(current_dir, helper_dir)
+        helper = helper_dir / Path(sys.executable).name
+        subprocess.Popen([str(helper), "--apply-update", str(staging), str(current_dir), str(os.getpid())], cwd=str(helper_dir))
+        self.quit()
+
+    def toggle_info_panel(self, _event=None):
+        """Right click toggles the role summary; left click remains capture."""
+        if not self.pair_verified or not self.config.get("deviceToken"):
+            self.pair()
+            return "break"
+        if self.info_panel and self.info_panel.winfo_exists():
+            self.close_info_panel(True)
+            return "break"
+        self.load_info_panel()
+        return "break"
+
+    def load_info_panel(self):
+        if self.busy:
+            return
+        def worker():
+            try:
+                data = self.api.state()
+                self.cached_state, self.cached_state_at = data, time.time()
+                self.root.after(0, lambda: self.show_info_panel(data))
+            except Exception as exc:
+                if self.cached_state:
+                    self.root.after(0, lambda: self.show_info_panel(self.cached_state))
+                else:
+                    self.root.after(0, lambda exc=exc: self.notice("角色信息加载失败", str(exc), "error"))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def show_info_panel(self, data):
+        if self.info_panel and self.info_panel.winfo_exists():
+            self.info_panel.destroy()
+        if self.info_settings_panel and self.info_settings_panel.winfo_exists():
+            self.info_settings_panel.destroy()
+            self.info_settings_panel = None
+        roles = accounts_and_characters(data)
+        current = (self.game.character if self.game else "") or ""
+        fallback = False
+        if self.config.get("sameAccountOnly"):
+            current_accounts = [a for a, c in roles if str(c.get("name", "")).strip() == current.strip()]
+            if current_accounts:
+                account_id = str(current_accounts[0].get("id"))
+                roles = [(a, c) for a, c in roles if str(a.get("id")) == account_id]
+            else:
+                fallback = True
+        def remaining(item):
+            _account, character = item
+            white = character.get("whiteEnergyDisplay", character.get("whiteEnergy", 0)) or 0
+            blue = character.get("blueEnergy", 0) or 0
+            return float(white) + float(blue)
+        roles.sort(key=remaining, reverse=True)
+        panel = tk.Toplevel(self.overlay)
+        panel.overrideredirect(True); panel.attributes("-topmost", True); panel.configure(bg=BORDER)
+        width = 590
+        visible_rows = max(1, min(6, len(roles)))
+        row_height = 60
+        height = 122 + visible_rows * row_height
+        x, y = self.dialog_position(width, height)
+        panel.geometry(f"{width}x{height}{x:+d}{y:+d}")
+        body = tk.Frame(panel, bg=BG); body.pack(fill="both", expand=True, padx=1, pady=1)
+        header = tk.Frame(body, bg=PANEL, height=50); header.pack(fill="x"); header.pack_propagate(False)
+        header.columnconfigure(0, weight=1)
+        brand = tk.Frame(header, bg=PANEL); brand.grid(row=0, column=0, sticky="w", padx=(14, 4))
+        tk.Label(brand, text="▣", bg=PANEL, fg=CYAN, font=("Segoe MDL2 Assets", 13)).pack(side="left", padx=(0, 7))
+        tk.Label(brand, text="Buyali 采集助手", bg=PANEL, fg=TEXT, font=(FONT, 11, "bold")).pack(side="left")
+        tk.Label(header, text="奥德降序⌄", bg=PANEL, fg=CYAN, font=(FONT, 8)).grid(row=0, column=1, padx=5)
+        tk.Label(header, text=f"更新 {time.strftime('%H:%M:%S')}", bg=PANEL, fg=MUTED, font=(FONT, 8)).grid(row=0, column=2, padx=5)
+        tk.Button(header, text="\ue713", command=self.toggle_info_settings, bg=PANEL, fg=TEXT,
+                  activebackground=PANEL_2, activeforeground=CYAN, relief="flat", bd=0,
+                  font=("Segoe MDL2 Assets", 12), cursor="hand2", padx=6).grid(row=0, column=3)
+        tk.Button(header, text="×", command=lambda: self.close_info_panel(True), bg=PANEL, fg=TEXT,
+                  activebackground=PANEL_2, activeforeground=TEXT, relief="flat", bd=0,
+                  font=(FONT, 16), cursor="hand2", padx=6).grid(row=0, column=4, padx=(0, 5))
+        headings = tk.Frame(body, bg=BG, height=36)
+        headings.pack(fill="x")
+        headings.pack_propagate(False)
+        for column, weight in enumerate((5, 2, 3)):
+            headings.columnconfigure(column, weight=weight, uniform="info")
+        tk.Label(headings, text="角色 / 账号", bg=BG, fg=MUTED, font=(FONT, 8), anchor="w").grid(row=0, column=0, sticky="ew", padx=(18, 4), pady=8)
+        tk.Label(headings, text="道具", bg=BG, fg=MUTED, font=(FONT, 8), anchor="e").grid(row=0, column=1, sticky="ew", padx=4)
+        tk.Label(headings, text="奥德（白奥德 + 蓝奥德）", bg=BG, fg=MUTED, font=(FONT, 8), anchor="e").grid(row=0, column=2, sticky="ew", padx=(4, 18))
+        footer = tk.Frame(body, bg=PANEL, height=37); footer.pack(side="bottom", fill="x"); footer.pack_propagate(False)
+        tk.Label(footer, text=f"共 {len(roles)} 个角色，滚轮可查看更多", bg=PANEL, fg=MUTED, font=(FONT, 8)).pack(side="left", padx=16)
+        tk.Label(footer, text="面板最多显示 6 个", bg=PANEL, fg=MUTED, font=(FONT, 8)).pack(side="right", padx=16)
+        canvas = tk.Canvas(body, bg=BG, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(body, orient="vertical", command=canvas.yview)
+        content = tk.Frame(canvas, bg=BG)
+        content.bind("<Configure>", lambda _e: canvas.configure(scrollregion=canvas.bbox("all")))
+        content_window = canvas.create_window((0, 0), window=content, anchor="nw")
+        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(content_window, width=event.width))
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True); scrollbar.pack(side="right", fill="y")
+        if fallback:
+            tk.Label(content, text="未识别当前角色，暂时显示全部角色", bg=BG, fg=AMBER, font=(FONT, 8)).pack(fill="x", padx=12, pady=4)
+        self.info_images = []
+        for account, character in roles:
+            row = tk.Frame(content, bg=BG, height=row_height, highlightbackground=BORDER, highlightthickness=1)
+            row.pack(fill="x")
+            row.pack_propagate(False)
+            for column, weight in enumerate((5, 2, 3)):
+                row.columnconfigure(column, weight=weight, uniform="info")
+            identity = tk.Frame(row, bg=BG)
+            identity.grid(row=0, column=0, sticky="nsew", padx=(16, 4))
+            char_class = str(character.get("charClass") or character.get("profession") or character.get("classKey") or "").strip()
+            icon_path = resource_path(f"assets/classes/{char_class}.webp")
+            if char_class and icon_path.exists():
+                icon = Image.open(icon_path).convert("RGBA"); icon.thumbnail((38, 38), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(icon); self.info_images.append(photo)
+                tk.Label(identity, image=photo, bg=BG, width=44).pack(side="left", padx=(0, 10))
+            else:
+                tk.Label(identity, text="◇", bg=BG, fg=MUTED, font=(FONT, 19), width=3).pack(side="left", padx=(0, 8))
+            names = tk.Frame(identity, bg=BG); names.pack(side="left", fill="both", expand=True, pady=9)
+            display_class = CLASS_LABELS.get(char_class, char_class)
+            character_name = character.get('name') or '未命名'
+            identity_text = f"{display_class} · {character_name}" if display_class else character_name
+            tk.Label(names, text=identity_text, bg=BG, fg=TEXT,
+                     font=(FONT, 9, "bold"), anchor="w").pack(fill="x")
+            tk.Label(names, text=f"账号：{account.get('name', '未命名账号')}", bg=BG, fg=MUTED,
+                     font=(FONT, 8), anchor="w").pack(fill="x", pady=(2, 0))
+            tk.Label(row, text=str(character.get("itemLevel", "—")), bg=BG, fg=AMBER, font=(FONT, 11, "bold"), anchor="e").grid(row=0, column=1, sticky="ew", padx=4)
+            white = character.get("whiteEnergyDisplay", character.get("whiteEnergy", 0)) or 0
+            blue = character.get("blueEnergy", 0) or 0
+            energy = tk.Frame(row, bg=BG); energy.grid(row=0, column=2, sticky="e", padx=(4, 18))
+            tk.Label(energy, text=str(int(white)), bg=BG, fg=TEXT, font=(FONT, 11)).pack(side="left")
+            tk.Label(energy, text=f" (+{int(blue)})", bg=BG, fg=CYAN, font=(FONT, 11, "bold")).pack(side="left")
+        def scroll_roles(event):
+            canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+            return "break"
+        def bind_wheel(widget):
+            widget.bind("<MouseWheel>", scroll_roles, add="+")
+            for child in widget.winfo_children():
+                bind_wheel(child)
+        bind_wheel(panel)
+        self.info_panel = panel
+
+    def close_info_panel(self, immediate=False):
+        if self.info_panel and self.info_panel.winfo_exists():
+            self.info_panel.destroy()
+        self.info_panel = None
+        if immediate and self.info_settings_panel and self.info_settings_panel.winfo_exists():
+            self.info_settings_panel.destroy()
+            self.info_settings_panel = None
+
+    def toggle_info_settings(self):
+        if self.info_settings_panel and self.info_settings_panel.winfo_exists():
+            self.info_settings_panel.destroy(); self.info_settings_panel = None
+            return
+        if not self.info_panel or not self.info_panel.winfo_exists():
+            return
+        settings = tk.Toplevel(self.info_panel)
+        settings.overrideredirect(True); settings.attributes("-topmost", True); settings.configure(bg=BORDER)
+        width, height = 230, 292
+        px = self.info_panel.winfo_x() + self.info_panel.winfo_width() + 8
+        py = self.info_panel.winfo_y()
+        left, top, right, bottom = work_area_for_point(px, py)
+        if px + width > right - 8:
+            px = self.info_panel.winfo_x() - width - 8
+        py = min(max(py, top + 8), bottom - height - 8)
+        settings.geometry(f"{width}x{height}{px:+d}{py:+d}")
+        body = tk.Frame(settings, bg=BG); body.pack(fill="both", expand=True, padx=1, pady=1)
+        tk.Label(body, text="设置", bg=BG, fg=TEXT, font=(FONT, 12, "bold"), anchor="w").pack(fill="x", padx=18, pady=(18, 10))
+        tk.Checkbutton(body, text="只显示同账号角色", variable=self.same_account_var, command=self.save_settings,
+                       bg=BG, fg=TEXT, selectcolor=PANEL_2, activebackground=BG, activeforeground=TEXT,
+                       font=(FONT, 9)).pack(anchor="w", padx=14, pady=(10, 4))
+        tk.Label(body, text="仅显示与当前游戏角色\n属于同一账号的角色", bg=BG, fg=MUTED, font=(FONT, 8),
+                 justify="left", anchor="w").pack(fill="x", padx=18)
+        tk.Frame(body, bg=BORDER, height=1).pack(fill="x", padx=18, pady=14)
+        tk.Label(body, text="自动更新", bg=BG, fg=TEXT, font=(FONT, 9), anchor="w").pack(fill="x", padx=18)
+        tk.Label(body, text=self.update_status_label.cget("text").replace("自动更新：", ""), bg=BG, fg=GREEN,
+                 font=(FONT, 8), anchor="w", wraplength=190, justify="left").pack(fill="x", padx=18, pady=(5, 0))
+        tk.Label(body, text=f"版本 {APP_VERSION}", bg=BG, fg=MUTED, font=(FONT, 8), anchor="w").pack(side="bottom", fill="x", padx=18, pady=14)
+        self.info_settings_panel = settings
 
     def show_control_panel(self, _event=None):
         self.root.deiconify()
@@ -385,16 +704,46 @@ class CollectorApp:
         shell.pack(fill="both", expand=True, padx=1, pady=1)
         head = tk.Frame(shell, bg=PANEL)
         head.pack(fill="x")
-        tk.Label(head, text=title, bg=PANEL, fg=TEXT, font=(FONT, 12, "bold"), anchor="w").pack(fill="x", padx=18, pady=13)
+        tk.Label(head, text="▣", bg=PANEL, fg=CYAN, font=("Segoe MDL2 Assets", 12)).pack(side="left", padx=(16, 7), pady=10)
+        tk.Label(head, text="BUYALI", bg=PANEL, fg=CYAN, font=(FONT, 9, "bold")).pack(side="left")
+        tk.Label(head, text=" 数据采集助手", bg=PANEL, fg=TEXT, font=(FONT, 9, "bold")).pack(side="left")
+        tk.Label(head, text=f"  ·  {APP_VERSION}", bg=PANEL, fg=MUTED, font=(FONT, 8)).pack(side="left")
+        tk.Button(head, text="×", command=lambda: self.safe_close_dialog(dialog), bg=PANEL, fg=TEXT,
+                  activebackground=PANEL_2, activeforeground=TEXT, relief="flat", bd=0,
+                  font=(FONT, 15), cursor="hand2", padx=8).pack(side="right", padx=(0, 6))
         body = tk.Frame(shell, bg=BG)
         body.pack(fill="both", expand=True, padx=18, pady=14)
+        title_row = tk.Frame(body, bg=BG); title_row.pack(fill="x", pady=(0, 13))
+        tk.Label(title_row, text="▤", bg=BG, fg=CYAN, font=("Segoe MDL2 Assets", 12)).pack(side="left", padx=(0, 8))
+        tk.Label(title_row, text=title, bg=BG, fg=TEXT, font=(FONT, 12, "bold"), anchor="w").pack(side="left", fill="x", expand=True)
         dialog.update_idletasks()
         hwnd = user32.GetAncestor(dialog.winfo_id(), 2)
         user32.SetWindowLongPtrW(hwnd, GWLP_HWNDPARENT, 0)
         style = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
         user32.SetWindowLongW(hwnd, GWL_EXSTYLE, (style | WS_EX_TOOLWINDOW) & ~WS_EX_APPWINDOW)
         user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW)
+        dialog.after_idle(lambda: self.fit_dialog(dialog, width, height))
         return dialog, body
+
+    def safe_close_dialog(self, dialog):
+        if dialog.winfo_exists():
+            dialog.destroy()
+        if self.capture_phase not in ("idle", "updating"):
+            self.reset_after_capture()
+
+    def fit_dialog(self, dialog, minimum_width, minimum_height):
+        """Grow a dialog to its real DPI-scaled content instead of clipping it."""
+        if not dialog.winfo_exists():
+            return
+        dialog.update_idletasks()
+        required_width = max(minimum_width, dialog.winfo_reqwidth())
+        required_height = max(minimum_height, dialog.winfo_reqheight())
+        px, py = self.overlay.winfo_x(), self.overlay.winfo_y()
+        left, top, right, bottom = work_area_for_point(px, py)
+        width = min(required_width, max(320, right - left - 16))
+        height = min(required_height, max(180, bottom - top - 16))
+        x, y = self.dialog_position(width, height)
+        dialog.geometry(f"{width}x{height}{x:+d}{y:+d}")
 
     def notice(self, title, message, kind="info", on_close=None):
         lines = max(1, (len(str(message)) + 25) // 26)
@@ -435,14 +784,14 @@ class CollectorApp:
         if self.pair_dialog_open:
             return
         self.pair_dialog_open = True
-        code = self.ask_text("连接数据采集助手", "请在 buyali.xyz 点击“数据采集”，输入显示的 6 位配对码：")
+        code = self.ask_text("连接数据采集助手", f"请在 {API_BASE} 点击“数据采集”，输入显示的 6 位配对码：")
         self.pair_dialog_open = False
         if not code:
             return
         try:
             self.api.redeem(code)
             self.pair_verified = True
-            self.notice("连接成功", "采集助手已与 buyali.xyz 配对。", "success")
+            self.notice("连接成功", f"采集助手已与 {API_BASE} 配对。", "success")
         except ApiError as exc:
             self.pair_verified = False
             self.notice("连接失败", str(exc), "error")
@@ -479,6 +828,9 @@ class CollectorApp:
 
     def capture(self):
         if self.busy: return
+        if not self.pair_verified or not self.config.get("deviceToken"):
+            self.pair()
+            return
         game = self.current_game()
         if not game:
             self.notice("未找到游戏", "没有检测到 AION2 游戏窗口，请确认游戏已经启动。", "error")
@@ -492,12 +844,15 @@ class CollectorApp:
         self.capture_serial += 1
         serial = self.capture_serial
         self.capture_phase = "capturing"
-        self.capture_button.config(text="◌  正在识别…", fg=CYAN, state="normal")
-        self.overlay.withdraw()
+        self.close_info_panel(True)
+        self.capture_button.config(text="◌", font=(FONT, 24, "bold"), fg=CYAN, state="normal")
         self.root.after(160, lambda: self.capture_after_hide(game, serial))
         self.root.after(25000, lambda: self.capture_watchdog(serial))
 
     def capture_after_hide(self, game, serial):
+        threading.Thread(target=self.capture_worker, args=(game, serial), daemon=True).start()
+
+    def capture_worker(self, game, serial):
         try:
             if serial != self.capture_serial: return
             image = ImageGrab.grab(bbox=game.rect, all_screens=True)
@@ -510,9 +865,9 @@ class CollectorApp:
             if not fields:
                 raise RuntimeError("未识别到有效数据，请确认已打开奥德或角色数据界面。")
             self.capture_phase = "network"
-            threading.Thread(target=self.prepare_result, args=(game, fields, scores, hint, serial), daemon=True).start()
+            self.prepare_result(game, fields, scores, hint, serial)
         except Exception as exc:
-            self.capture_error(exc, serial)
+            self.root.after(0, lambda exc=exc: self.capture_error(exc, serial))
 
     def prepare_result(self, game, fields, scores, hint, serial):
         try:
@@ -587,7 +942,7 @@ class CollectorApp:
     def choose_binding(self, data, game_name):
         result, ready = [], threading.Event()
         def show():
-            dialog, body = self.make_dialog("绑定网页角色", 600, 430)
+            dialog, body = self.make_dialog("绑定网页角色", 470, 360)
             tk.Label(body, text=f"已识别游戏角色：{game_name}", bg=BG, fg=CYAN, font=(FONT, 11, "bold"), justify="left").pack(fill="x", pady=(0, 14))
             entries = [
                 (account, character)
@@ -648,14 +1003,16 @@ class CollectorApp:
         if serial != self.capture_serial: return
         self.capture_phase = "confirm"
         account, character = target
-        height = 390 + 52 * len(fields)
-        dialog, body = self.make_dialog("确认采集内容", 590, height)
+        height = 245 + 44 * len(fields)
+        dialog, body = self.make_dialog("确认采集内容", 470, height)
         tk.Label(body, text=f"识别角色：{game.character}", bg=BG, fg=CYAN, font=(FONT, 11, "bold"), anchor="w").pack(fill="x")
         tk.Label(body, text=f"写入位置：{account.get('name')} · {character.get('name')}", bg=BG, fg=TEXT, font=(FONT, 10), anchor="w").pack(fill="x", pady=(3, 12))
         headings = tk.Frame(body, bg=BG); headings.pack(fill="x", pady=(0, 3))
-        tk.Label(headings, text="数据项", width=10, bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").pack(side="left")
-        tk.Label(headings, text="变更前", width=15, bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").pack(side="left")
-        tk.Label(headings, text="变更后", bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").pack(side="left", padx=(24, 0))
+        for column, weight in enumerate((2, 3, 1, 4)):
+            headings.columnconfigure(column, weight=weight, uniform="capture")
+        tk.Label(headings, text="数据项", bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").grid(row=0, column=0, sticky="ew")
+        tk.Label(headings, text="变更前", bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").grid(row=0, column=1, sticky="ew", padx=4)
+        tk.Label(headings, text="变更后", bg=BG, fg=MUTED, font=(FONT, 9), anchor="w").grid(row=0, column=3, sticky="ew", padx=4)
         entries = {}
         old_values = {}
         def display_value(value):
@@ -677,17 +1034,19 @@ class CollectorApp:
             entry.config(fg=AMBER if changed else TEXT)
         for key, value in fields.items():
             row = tk.Frame(body, bg=BG); row.pack(fill="x", pady=4)
-            tk.Label(row, text=FIELD_LABELS[key], width=10, bg=BG, fg=MUTED, font=(FONT, 10), anchor="w").pack(side="left")
+            for column, weight in enumerate((2, 3, 1, 4)):
+                row.columnconfigure(column, weight=weight, uniform="capture")
+            tk.Label(row, text=FIELD_LABELS[key], bg=BG, fg=MUTED, font=(FONT, 10), anchor="w").grid(row=0, column=0, sticky="ew")
             # White aether shown by the webpage includes automatic three-hour
             # recovery.  The API exposes that effective value separately from
             # the stored baseline so the comparison matches what users see.
             old_values[key] = character.get("whiteEnergyDisplay") if key == "whiteEnergy" else character.get(key)
             if old_values[key] is None:
                 old_values[key] = character.get(key)
-            tk.Label(row, text=display_value(old_values[key]), width=15, bg=BG, fg=TEXT, font=(FONT, 10), anchor="w").pack(side="left")
-            tk.Label(row, text="→", width=3, bg=BG, fg=MUTED, font=(FONT, 10)).pack(side="left")
+            tk.Label(row, text=display_value(old_values[key]), bg=BG, fg=TEXT, font=(FONT, 10), anchor="w").grid(row=0, column=1, sticky="ew", padx=4)
+            tk.Label(row, text="→", bg=BG, fg=MUTED, font=(FONT, 10)).grid(row=0, column=2, sticky="ew", padx=2)
             entry = tk.Entry(row, bg=PANEL_2, fg=TEXT, insertbackground=TEXT, relief="flat", font=(FONT, 10))
-            entry.insert(0, str(value)); entry.pack(side="left", fill="x", expand=True, ipady=6); entries[key] = entry
+            entry.insert(0, str(value)); entry.grid(row=0, column=3, sticky="ew", ipady=6, padx=(4, 0)); entries[key] = entry
             entry.bind("<KeyRelease>", lambda _event, k=key, e=entry: update_change_color(k, e))
             update_change_color(key, entry)
         binding_matches = str(character.get("name", "")).strip() == str(game.character).strip()
@@ -767,7 +1126,7 @@ class CollectorApp:
     def success_dialog(self, transaction_id, fields, character, serial):
         if serial != self.capture_serial: return
         self.capture_phase = "success"
-        dialog, body = self.make_dialog("采集成功", 460, 350 + 28 * len(fields))
+        dialog, body = self.make_dialog("采集成功", 380, 245 + 24 * len(fields))
         tk.Label(body, text="✓  已写入云端", bg=BG, fg=GREEN, font=(FONT, 15, "bold")).pack(anchor="w")
         tk.Label(body, text=f"当前角色：{character}\n" + "\n".join(f"{FIELD_LABELS[k]}：{v:,}" for k, v in fields.items()), bg=BG, fg=TEXT, font=(FONT, 10), justify="left").pack(anchor="w", pady=14)
         status = tk.Label(body, bg=BG, fg=MUTED, font=(FONT, 9)); status.pack(fill="x", pady=5)
@@ -804,7 +1163,7 @@ class CollectorApp:
     def reset_after_capture(self, show=True):
         self.busy = False
         self.capture_phase = "idle"
-        self.capture_button.config(text="◎  采集数据", fg=TEXT, state="normal")
+        self.capture_button.config(text="📷", font=("Segoe UI Emoji", 25), fg=CYAN, state="normal")
         if show:
             self.overlay.deiconify(); self.force_overlay_topmost()
 
@@ -820,9 +1179,9 @@ class CollectorApp:
 
 
 if __name__ == "__main__":
-    if not relaunch_from_ascii_runtime():
+    if not apply_update_mode() and not relaunch_from_ascii_runtime():
         kernel32 = ctypes.windll.kernel32
         kernel32.SetLastError(0)
-        mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.1")
+        mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector")
         if kernel32.GetLastError() != 183:
             CollectorApp().run()
