@@ -1,10 +1,13 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "collector"))
 
-from app import parse_aether_candidates, parse_currency_candidates
+from app import parse_aether_candidates, parse_currency_candidates, recognize
 
 
 class CollectorParsingTests(unittest.TestCase):
@@ -20,15 +23,35 @@ class CollectorParsingTests(unittest.TestCase):
         fields, _ = parse_aether_candidates([("285", 0.93), ("(+1,140)", 0.91), ("/840", 0.96)])
         self.assertEqual(fields, {"whiteEnergy": 285, "blueEnergy": 1140})
 
-    def test_missing_blue_is_not_fabricated_as_zero(self):
+    def test_plain_aether_counter_means_blue_zero(self):
         fields, _ = parse_aether_candidates([("285/840", 0.97)])
-        self.assertEqual(fields, {"whiteEnergy": 285})
+        self.assertEqual(fields, {"whiteEnergy": 285, "blueEnergy": 0})
+
+    @patch("app.rapid_read")
+    def test_capture_pipeline_preserves_blue_zero_for_web_update(self, rapid_read):
+        rapid_read.side_effect = [
+            [("45/840", 0.99), ("0", 0.99), ("338", 0.99),
+             ("93,196,241", 0.99), ("91,925,241", 0.99)],
+            [],
+        ]
+        fields, _ = recognize(Image.new("RGB", (1920, 1080), "black"))
+        self.assertEqual(fields["whiteEnergy"], 45)
+        self.assertIn("blueEnergy", fields)
+        self.assertEqual(fields["blueEnergy"], 0)
 
     def test_kina_zero_is_valid(self):
         result = parse_currency_candidates([
             ("72,000", 0.95), ("1,538", 0.96), ("0", 0.98), ("31,146", 0.95)
         ], has_aether=True)
         self.assertEqual(result[0], 0)
+
+    def test_normal_hud_kina_is_first_of_three_formatted_currencies(self):
+        result = parse_currency_candidates([
+            ("190,418,686", 0.99),
+            ("167,517,846", 0.99),
+            ("13,706,005", 0.99),
+        ], has_aether=False)
+        self.assertEqual(result[0], 190_418_686)
 
 
 if __name__ == "__main__":

@@ -19,15 +19,19 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 from PIL import Image, ImageEnhance, ImageGrab
-from rapidocr_onnxruntime import RapidOCR
+try:
+    from rapidocr_onnxruntime import RapidOCR
+except ImportError:  # Parsing-only tests do not need the OCR runtime.
+    RapidOCR = None
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.2"
+APP_VERSION = "1.3.3"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
-CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / "BuyaliCollector"
+CONFIG_DIR_NAME = "BuyaliCollector-test" if IS_TEST_BUILD else "BuyaliCollector"
+CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / CONFIG_DIR_NAME
 CONFIG_FILE = CONFIG_DIR / "config.json"
 FIELD_LABELS = {"whiteEnergy": "白奥德", "blueEnergy": "蓝奥德", "combatPower": "战斗力", "itemLevel": "道具等级", "kina": "基纳"}
 
@@ -78,12 +82,18 @@ def configure_ocr() -> None:
 
 
 _RAPID_ENGINE = None
+_RAPID_ENGINE_LOCK = threading.Lock()
+_RAPID_INFERENCE_LOCK = threading.Lock()
 
 
 def rapid_engine():
     global _RAPID_ENGINE
+    if RapidOCR is None:
+        raise RuntimeError("RapidOCR 运行库未安装，无法执行图像识别")
     if _RAPID_ENGINE is None:
-        _RAPID_ENGINE = RapidOCR()
+        with _RAPID_ENGINE_LOCK:
+            if _RAPID_ENGINE is None:
+                _RAPID_ENGINE = RapidOCR()
     return _RAPID_ENGINE
 
 
@@ -93,7 +103,8 @@ def rapid_read(image: Image.Image, target_height: int = 220) -> list[tuple[str, 
     prepared = image.convert("RGB")
     if scale > 1:
         prepared = prepared.resize((prepared.width * scale, prepared.height * scale), Image.Resampling.LANCZOS)
-    result, _ = rapid_engine()(np.asarray(prepared))
+    with _RAPID_INFERENCE_LOCK:
+        result, _ = rapid_engine()(np.asarray(prepared))
     return [(str(item[1]).strip(), float(item[2])) for item in (result or []) if str(item[1]).strip()]
 
 
@@ -397,8 +408,12 @@ def parse_aether_candidates(lines: list[tuple[str, float]]) -> tuple[dict, dict]
         if match:
             white = integer(match.group(1))
             if white is not None and 0 <= white <= 840:
-                fields["whiteEnergy"] = white
-                scores["whiteEnergy"] = min(99, confidence * 100)
+                score = min(99, confidence * 100)
+                # The current game UI omits the ``+0`` segment entirely. A
+                # complete ``white/840`` counter therefore explicitly means
+                # blue aether is zero, rather than that the field is missing.
+                fields.update(whiteEnergy=white, blueEnergy=0)
+                scores.update(whiteEnergy=score, blueEnergy=score)
                 break
     return fields, scores
 
@@ -420,7 +435,11 @@ def parse_currency_candidates(lines: list[tuple[str, float]], has_aether: bool) 
                 values.append((value, confidence))
     if len(values) < 2:
         return None
-    index = -2 if has_aether else (-3 if len(values) >= 4 else -2)
+    # With aether visible, kina is followed by one counter. In the normal HUD
+    # three formatted currencies are shown and kina is the first one. Older
+    # code selected the penultimate value for a three-counter HUD, assigning
+    # the adjacent currency to kina.
+    index = -2 if has_aether else (-3 if len(values) >= 3 else -2)
     return values[index]
 
 
@@ -464,6 +483,7 @@ def recognize_top_status_bar(image: Image.Image) -> tuple[dict, dict]:
                 fields.update(whiteEnergy=white_value, blueEnergy=blue_value)
                 scores.update(whiteEnergy=94, blueEnergy=94)
                 break
+    plain_aether_zero = False
     if "whiteEnergy" not in fields:
         for line in candidates:
             normalized = line.replace(".", ",")
@@ -473,6 +493,7 @@ def recognize_top_status_bar(image: Image.Image) -> tuple[dict, dict]:
             white_value = integer(white.group(1))
             if white_value is not None and 0 <= white_value <= 840:
                 fields["whiteEnergy"], scores["whiteEnergy"] = white_value, 92
+                plain_aether_zero = True
                 break
     if "whiteEnergy" in fields and "blueEnergy" not in fields:
         # One threshold may preserve the '+blue/840' suffix while damaging the
@@ -491,6 +512,11 @@ def recognize_top_status_bar(image: Image.Image) -> tuple[dict, dict]:
             value = max(counts, key=lambda candidate: (counts[candidate], candidate))
             fields["blueEnergy"] = value
             scores["blueEnergy"] = min(88, 55 + counts[value] * 10)
+        elif plain_aether_zero:
+            # ``45/840`` is the game's zero-blue form. Preserve zero as a
+            # real update value so the server can clear an earlier balance.
+            fields["blueEnergy"] = 0
+            scores["blueEnergy"] = scores["whiteEnergy"]
 
     # Currency values are laid out in a stable order. The final two numeric
     # counters are kina and the following gold currency; select the penultimate
@@ -906,7 +932,7 @@ class CollectorApp:
 
 if __name__ == "__main__":
     kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.2")
+    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.3")
     if kernel32.GetLastError() == 183:
         user32.MessageBoxW(None, "数据采集助手已经在运行。", APP_NAME, 0x40)
         sys.exit(0)

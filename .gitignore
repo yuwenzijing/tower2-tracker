@@ -12,5 +12,6 @@ collector/release/
 collector/debug-*/
 collector/*.spec
 collector/__pycache__/
+**/__pycache__/
 ._*
 **/._*

@@ -2,12 +2,12 @@ $ErrorActionPreference = 'Stop'
 $CollectorRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PythonExe = if ($env:BUYALI_BUILD_PYTHON) { $env:BUYALI_BUILD_PYTHON } elseif (Test-Path 'C:\tmp\buyali-python\python.exe') { 'C:\tmp\buyali-python\python.exe' } else { 'python.exe' }
 $ReleaseRoot = Join-Path $CollectorRoot 'release'
-$Version = '1.3.2'
+$Version = '1.3.3'
 $PackageRoot = Join-Path $ReleaseRoot "BuyaliCollector-v$Version"
 if (Test-Path $PackageRoot) { Remove-Item -LiteralPath $PackageRoot -Recurse -Force }
 New-Item -ItemType Directory -Path $PackageRoot -Force | Out-Null
 & $PythonExe "$CollectorRoot\extract_class_icons.py"
-& $PythonExe -m PyInstaller --noconfirm --clean --windowed --name 'BuyaliCollector' --distpath $ReleaseRoot --workpath "$CollectorRoot\build" --specpath "$CollectorRoot" --exclude-module pandas --collect-all rapidocr_onnxruntime --add-data "$CollectorRoot\assets;assets" "$CollectorRoot\main.py"
+& $PythonExe -m PyInstaller --noconfirm --clean --windowed --name 'BuyaliCollector' --icon "$CollectorRoot\assets\icons\buyali-collector.ico" --distpath $ReleaseRoot --workpath "$CollectorRoot\build" --specpath "$CollectorRoot" --exclude-module pandas --collect-all rapidocr_onnxruntime --add-data "$CollectorRoot\assets;assets" "$CollectorRoot\main.py"
 $BuiltRoot = Join-Path $ReleaseRoot 'BuyaliCollector'
 Move-Item -LiteralPath (Join-Path $BuiltRoot 'BuyaliCollector.exe') -Destination (Join-Path $PackageRoot 'BuyaliCollector.exe')
 Move-Item -LiteralPath (Join-Path $BuiltRoot '_internal') -Destination (Join-Path $PackageRoot '_internal')

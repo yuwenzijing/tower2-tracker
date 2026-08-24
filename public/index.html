@@ -1084,17 +1084,90 @@
   }
   .todo-section.sanctuary-row { border-top: none; }
   .todo-subtitle {
-    padding: 7px 14px;
+    height: 31px;
+    padding: 0 14px;
     border-top: 1px solid var(--glass-border);
     font-size: 12px;
     font-weight: 600;
     color: var(--text-dim);
     background: linear-gradient(90deg, rgba(90,170,255,0.08), rgba(34,221,255,0.03));
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    box-sizing: border-box;
   }
+  .todo-heading { flex: 0 0 auto; white-space: nowrap; }
   .todo-subtitle .todo-count { font-weight: 800; }
   .todo-subtitle .todo-count.all { color: var(--green); }
   .todo-subtitle .todo-count.none { color: var(--red); }
   .todo-subtitle .todo-count.partial { color: #e8c040; }
+  .char-note-area {
+    margin-left: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: min(62%, 560px);
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    overflow: hidden;
+  }
+  .char-note-icon,
+  .char-note-edit {
+    font-family: "Segoe MDL2 Assets";
+    font-weight: 400;
+    font-style: normal;
+    flex: 0 0 auto;
+  }
+  .char-note-icon { color: var(--text-dim); font-size: 14px; }
+  .char-note-edit {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-faint);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: color .2s, background .2s;
+  }
+  .char-note-edit:hover,
+  .char-note-edit:focus-visible {
+    color: var(--cyan);
+    background: rgba(34,221,255,.06);
+    outline: none;
+  }
+  .char-note-viewport {
+    min-width: 0;
+    max-width: 20em;
+    overflow: hidden;
+    color: var(--gold);
+    white-space: nowrap;
+    text-align: right;
+  }
+  .char-note-text { display: inline-block; white-space: nowrap; }
+  .char-note-viewport.is-long { text-overflow: ellipsis; }
+  .char-note-input {
+    width: 100%;
+    min-width: 80px;
+    height: 23px;
+    box-sizing: border-box;
+    border: 1px solid rgba(34,221,255,.38);
+    border-radius: 6px;
+    background: rgba(3,14,30,.86);
+    color: var(--gold);
+    font: 600 12px/1 "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    padding: 3px 8px;
+    outline: none;
+  }
+  .char-note-input:focus { border-color: var(--cyan); box-shadow: 0 0 0 2px rgba(34,221,255,.08); }
+  @media (max-width: 760px) {
+    .char-note-area { max-width: 52%; }
+  }
   .todo-item {
     display: flex;
     align-items: center;
@@ -1777,7 +1850,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.2</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.3</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -1972,6 +2045,7 @@ var undoStack = [];
 var undoMetaStack = [];
 var UNDO_MAX = 5;
 var selectedChar = null; // { accId, charId } or null
+var editingNote = null; // { accId, charId, original } or null
 var charEnergyUndoStacks = {}; // { "accId-charId": [{white, blue}, ...] }
 var energyCooldownUntil = 0;
 var ENERGY_COOLDOWN_MS = 100;
@@ -2025,6 +2099,72 @@ function toggleCharSelection(accId, charId) {
 function isCharSelected(accId, charId) {
   return selectedChar && selectedChar.accId === accId && selectedChar.charId === charId;
 }
+
+function isEditingNote(accId, charId) {
+  return editingNote && editingNote.accId === accId && editingNote.charId === charId;
+}
+
+function startNoteEdit(accId, charId) {
+  var r = findChar(accId, charId); if (!r || !isCharSelected(accId, charId)) return;
+  editingNote = { accId: accId, charId: charId, original: String(r.ch.note || '') };
+  render();
+  requestAnimationFrame(function() {
+    var input = document.querySelector('.char-note-input[data-acc-id="' + CSS.escape(accId) + '"][data-char-id="' + CSS.escape(charId) + '"]');
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+  });
+}
+
+function finishNoteEdit(save, valueOverride) {
+  if (!editingNote) return;
+  var current = editingNote;
+  var r = findChar(current.accId, current.charId);
+  var input = document.querySelector('.char-note-input[data-acc-id="' + CSS.escape(current.accId) + '"][data-char-id="' + CSS.escape(current.charId) + '"]');
+  editingNote = null;
+  if (!r) { render(); return; }
+  if (save) {
+    var next = String(valueOverride !== undefined ? valueOverride : (input ? input.value : '')).trim();
+    if (next !== String(r.ch.note || '')) {
+      pushUndo();
+      r.ch.note = next;
+      saveData();
+    }
+  }
+  render();
+}
+
+function handleNoteKey(event) {
+  if (event.key === 'Enter') { event.preventDefault(); finishNoteEdit(true); }
+  else if (event.key === 'Escape') { event.preventDefault(); finishNoteEdit(false); }
+}
+
+function noteTextLength(value) { return Array.from(String(value || '')).length; }
+
+function startNoteMarquee(viewport) {
+  if (!viewport || !viewport.classList.contains('is-long')) return;
+  var text = viewport.querySelector('.char-note-text');
+  if (!text || text.scrollWidth <= viewport.clientWidth) return;
+  stopNoteMarquee(viewport);
+  var distance = text.scrollWidth - viewport.clientWidth;
+  viewport._noteAnimation = text.animate(
+    [{ transform: 'translateX(0)' }, { transform: 'translateX(-' + distance + 'px)' }],
+    { duration: Math.max(2400, distance * 35), delay: 350, easing: 'linear', fill: 'forwards' }
+  );
+}
+
+function stopNoteMarquee(viewport) {
+  if (viewport && viewport._noteAnimation) {
+    viewport._noteAnimation.cancel();
+    viewport._noteAnimation = null;
+  }
+}
+
+document.addEventListener('pointerdown', function(event) {
+  if (!editingNote) return;
+  if (event.target.closest('.char-note-input') || event.target.closest('.char-note-edit')) return;
+  var input = document.querySelector('.char-note-input');
+  var pendingValue = input ? input.value : '';
+  setTimeout(function() { if (editingNote) finishNoteEdit(true, pendingValue); }, 0);
+}, true);
 
 function charEnergyKey(accId, charId) { return accId + '-' + charId; }
 
@@ -2437,6 +2577,7 @@ function ensureCharDefaults(ch) {
   if (ch.itemLevel === undefined) ch.itemLevel = null;
   if (ch.combatPower === undefined) ch.combatPower = null;
   if (ch.kina === undefined) ch.kina = null;
+  if (ch.note === undefined) ch.note = '';
 }
 function ensureAccDefaults(acc) {
   if (!acc.membership) acc.membership = 'none';
@@ -2540,6 +2681,7 @@ function addCharacter(accId, withRender = true) {
     itemLevel: null,
     combatPower: null,
     kina: null,
+    note: '',
   });
   saveData();
   if (withRender) render();
@@ -2937,6 +3079,22 @@ function render() {
             '<button class="energy-op-btn undo-icon" ' + (canUndoEnergy ? '' : 'disabled') + ' onclick="event.stopPropagation();energyOp(\'' + acc.id + '\',\'' + ch.id + '\',\'undo\')" title="撤回能量操作">↩' + (canUndoEnergy ? '<sup>' + charEnergyUndoStacks[charEnergyKey(acc.id, ch.id)].length + '</sup>' : '') + '</button>' +
           '</div>';
         }
+        var note = String(ch.note || '');
+        var noteIsLong = noteTextLength(note) > 20;
+        var noteHtml = '';
+        if (isSelected) {
+          if (isEditingNote(acc.id, ch.id)) {
+            noteHtml = '<div class="char-note-area note-editor">' +
+              '<input class="char-note-input" data-acc-id="' + escapeAttr(acc.id) + '" data-char-id="' + escapeAttr(ch.id) + '" maxlength="200" value="' + escapeAttr(note) + '" onkeydown="handleNoteKey(event)" aria-label="角色备注" />' +
+              '</div>';
+          } else {
+            noteHtml = '<div class="char-note-area">' +
+              (note ? '<span class="char-note-icon" aria-hidden="true">&#xE70B;</span>' +
+                '<span class="char-note-viewport' + (noteIsLong ? ' is-long' : '') + '" title="' + escapeAttr(note) + '" onmouseenter="startNoteMarquee(this)" onmouseleave="stopNoteMarquee(this)"><span class="char-note-text">' + escapeHtml(note) + '</span></span>' : '') +
+              '<button class="char-note-edit" type="button" onclick="event.stopPropagation();startNoteEdit(\'' + acc.id + '\',\'' + ch.id + '\')" title="编辑备注" aria-label="编辑备注">&#xE70F;</button>' +
+              '</div>';
+          }
+        }
         charCard.innerHTML = `
           <button class="char-delete" onclick="removeCharacter('${acc.id}', '${ch.id}')" title="删除角色">✕</button>
           <div class="char-header">
@@ -3007,7 +3165,8 @@ function render() {
             </div>
           </div>
           <div class="todo-subtitle">
-            每周待办 <span class="todo-count ${todoCountClass}">（${todoCount}/8）</span>
+            <span class="todo-heading">每周待办 <span class="todo-count ${todoCountClass}">（${todoCount}/8）</span></span>
+            ${noteHtml}
           </div>
           <div class="todo-section sanctuary-row">
             <div class="todo-item ${s1Done?'done':''}" data-todo="sanctuary1" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary1')" title="点击切换完成状态">
@@ -3523,6 +3682,10 @@ function getSyncBaseRevision() {
   return localStorage.getItem(SYNC_BASE_REVISION_KEY) || null;
 }
 
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
 function setSyncBaseRevision(revision) {
   if (revision) localStorage.setItem(SYNC_BASE_REVISION_KEY, revision);
   else localStorage.removeItem(SYNC_BASE_REVISION_KEY);
@@ -3984,7 +4147,7 @@ setInterval(updateRecoveryDisplay, 30000);
 <script>
 if (location.hostname === 'test.buyali.xyz') {
   const versionTag = document.getElementById('appVersionTag');
-  if (versionTag) versionTag.textContent = 'V1.3.2-test';
+  if (versionTag) versionTag.textContent = 'V1.3.3-test';
 }
 </script>
 </body>
