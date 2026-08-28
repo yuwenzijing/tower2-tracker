@@ -26,7 +26,7 @@ except ImportError:  # Parsing-only tests do not need the OCR runtime.
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.4"
+APP_VERSION = "1.3.4.1"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
@@ -455,6 +455,15 @@ def parse_currency_candidates(lines: list[tuple[str, float]], has_aether: bool) 
     return values[index]
 
 
+def has_truncated_currency_candidate(lines: list[tuple[str, float]]) -> bool:
+    """Detect comma-grouped counters where OCR dropped trailing digits."""
+    for text, _confidence in lines:
+        compact = re.sub(r"\s+", "", text).strip(".,")
+        if re.fullmatch(r"\d{1,3}(?:,\d{3})+,\d{1,2}", compact):
+            return True
+    return False
+
+
 def recognize_top_status_bar(image: Image.Image) -> tuple[dict, dict]:
     """Recognize menu counters by their semantic format and order.
 
@@ -564,12 +573,22 @@ def recognize(image: Image.Image) -> tuple[dict, dict]:
 
     # Both the normal HUD and menu screens keep resource counters in the top
     # 7.5% strip; their horizontal position changes, so read the entire strip.
-    top_lines = rapid_read(crop_ratio(image, (0.0, 0.0, 0.98, 0.075)), target_height=260)
+    top_band = crop_ratio(image, (0.0, 0.0, 0.98, 0.075))
+    top_lines = rapid_read(top_band, target_height=260)
     aether_fields, aether_scores = parse_aether_candidates(top_lines)
     fields.update(aether_fields)
     scores.update(aether_scores)
 
     currency = parse_currency_candidates(top_lines, "whiteEnergy" in fields)
+    if has_truncated_currency_candidate(top_lines):
+        # Scaling can occasionally merge a digit into the currency icon or
+        # neighboring glyph (438,589,356 -> 438,589,36). Re-read at the source
+        # scale only for this suspicious syntax and prefer the stronger valid
+        # result. This avoids doubling OCR work during ordinary captures.
+        native_lines = rapid_read(top_band, target_height=180)
+        native_currency = parse_currency_candidates(native_lines, "whiteEnergy" in fields)
+        if native_currency and (currency is None or native_currency[1] > currency[1]):
+            currency = native_currency
     if currency is not None:
         value, confidence = currency
         fields["kina"], scores["kina"] = value, min(99, confidence * 100)
@@ -944,7 +963,7 @@ class CollectorApp:
 
 if __name__ == "__main__":
     kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.4")
+    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.4.1")
     if kernel32.GetLastError() == 183:
         user32.MessageBoxW(None, "数据采集助手已经在运行。", APP_NAME, 0x40)
         sys.exit(0)

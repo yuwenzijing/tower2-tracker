@@ -36,7 +36,7 @@
         '<button class="capture-close" type="button" aria-label="关闭">×</button>' +
         '<h3>连接数据采集助手</h3>' +
         '<div class="capture-desc">在 Windows 采集助手中输入下方一次性配对码。配对成功后，助手可以按游戏窗口标题匹配角色并提交识别结果。配对码 5 分钟内有效。</div>' +
-        '<a class="capture-download" id="captureDownload" href="https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.4/BuyaliCollector-v1.3.4.zip" target="_blank" rel="noopener">下载 Windows 数据采集助手 V1.3.4</a>' +
+        '<a class="capture-download" id="captureDownload" href="https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.4.1/BuyaliCollector-v1.3.4.1.zip" target="_blank" rel="noopener">下载 Windows 数据采集助手 V1.3.4.1</a>' +
         '<div class="capture-code" id="capturePairCode">------</div>' +
         '<div class="capture-status" id="capturePairStatus"></div>' +
         '<div class="capture-actions">' +
@@ -49,7 +49,7 @@
       var testDownload = overlay.querySelector('#captureDownload');
       testDownload.removeAttribute('href');
       testDownload.removeAttribute('target');
-      testDownload.textContent = 'V1.3.4 测试包仅提供本地测试';
+      testDownload.textContent = 'V1.3.4.1 测试包仅提供本地测试';
       testDownload.style.cursor = 'default';
     }
     overlay.querySelector('.capture-close').onclick = closeCapturePairing;
@@ -81,7 +81,7 @@
       var response = await fetch(API + '/pair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Sync-Token': token },
-        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.4-test' : 'web-v1.3.4' })
+        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.4.1-test' : 'web-v1.3.4.1' })
       });
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));

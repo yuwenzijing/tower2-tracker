@@ -5,7 +5,7 @@ Windows 便携式采集程序。无需安装 Python 或 Tesseract；程序只在
 ## 使用方法
 
 1. 先将 ZIP 完整解压，不能直接在压缩包预览窗口中运行。
-2. 打开 `BuyaliCollector-v1.3.4` 文件夹，直接运行根目录的 `BuyaliCollector.exe`。
+2. 打开 `BuyaliCollector-v1.3.4.1` 文件夹，直接运行根目录的 `BuyaliCollector.exe`。
 3. `_internal` 是程序运行所需目录，请勿删除或改名。
 4. 打开 `https://buyali.xyz`，点击“数据采集”生成配对码，并在助手中输入。
 5. 任务栏保留“Buyali 数据采集助手”入口，可查看状态、重新绑定、显示浮窗或退出。

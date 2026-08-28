@@ -2,11 +2,11 @@
 
 Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。网页用于管理账号、角色、奥德、道具等级、战斗力、基纳和待办事项；Windows 数据采集助手可从当前游戏窗口识别数据，并在用户确认后写入已配对的网页数据。
 
-当前正式版本：`V1.3.4`
+当前正式版本：`V1.3.4.1`
 
 - 正式网站：[https://buyali.xyz](https://buyali.xyz)
-- 最新版本：[GitHub Release V1.3.4](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.4)
-- Windows 采集助手：[下载 BuyaliCollector-v1.3.4.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.4/BuyaliCollector-v1.3.4.zip)
+- 最新版本：[GitHub Release V1.3.4.1](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.4.1)
+- Windows 采集助手：[下载 BuyaliCollector-v1.3.4.1.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.4.1/BuyaliCollector-v1.3.4.1.zip)
 - 完整更新内容：[V1.3.3 更新日志](V1.3.3更新日志.md)
 
 ## 主要功能
@@ -31,9 +31,9 @@ Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。
 
 ## 安装采集助手
 
-1. 下载 `BuyaliCollector-v1.3.4.zip`。
+1. 下载 `BuyaliCollector-v1.3.4.1.zip`。
 2. 将压缩包完整解压到任意可写文件夹。
-3. 打开解压后的 `BuyaliCollector-v1.3.4` 文件夹。
+3. 打开解压后的 `BuyaliCollector-v1.3.4.1` 文件夹。
 4. 运行根目录中的 `BuyaliCollector.exe`。
 5. 保留 `_internal` 目录，不能删除、移动或改名。
 

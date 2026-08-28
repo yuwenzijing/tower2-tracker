@@ -7,7 +7,7 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "collector"))
 
-from app import parse_aether_candidates, parse_currency_candidates, recognize
+from app import has_truncated_currency_candidate, parse_aether_candidates, parse_currency_candidates, recognize
 
 
 class CollectorParsingTests(unittest.TestCase):
@@ -74,6 +74,28 @@ class CollectorParsingTests(unittest.TestCase):
             ("167,517,846", 0.99),
         ], has_aether=False)
         self.assertEqual(result[0], 190_418_686)
+
+    def test_truncated_currency_group_requests_scale_fallback(self):
+        self.assertTrue(has_truncated_currency_candidate([
+            ("3,338", 0.99),
+            ("438,589,36", 0.84),
+            ("433,589,356", 0.85),
+        ]))
+        self.assertFalse(has_truncated_currency_candidate([
+            ("3,338", 0.99),
+            ("438,589,356", 0.87),
+            ("433,589,356", 0.84),
+        ]))
+
+    @patch("app.rapid_read")
+    def test_capture_rechecks_truncated_kina_at_native_scale(self, rapid_read):
+        rapid_read.side_effect = [
+            [("3,338", 0.99), ("438,589,36", 0.84), ("433,589,356", 0.85)],
+            [("3,338", 0.99), ("438,589,356", 0.87), ("433,589,356", 0.84)],
+            [],
+        ]
+        fields, _ = recognize(Image.new("RGB", (3840, 2160), "black"))
+        self.assertEqual(fields["kina"], 438_589_356)
 
 
 if __name__ == "__main__":
