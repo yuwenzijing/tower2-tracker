@@ -2,7 +2,7 @@ $ErrorActionPreference = 'Stop'
 $CollectorRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $PythonExe = if ($env:BUYALI_BUILD_PYTHON) { $env:BUYALI_BUILD_PYTHON } elseif (Test-Path 'C:\tmp\buyali-python\python.exe') { 'C:\tmp\buyali-python\python.exe' } else { 'python.exe' }
 $ReleaseRoot = Join-Path $CollectorRoot 'release'
-$Version = '1.3.3.1'
+$Version = '1.3.4'
 $PackageRoot = Join-Path $ReleaseRoot "BuyaliCollector-v$Version"
 if (Test-Path $PackageRoot) { Remove-Item -LiteralPath $PackageRoot -Recurse -Force }
 New-Item -ItemType Directory -Path $PackageRoot -Force | Out-Null

@@ -395,7 +395,10 @@ class CollectorApp:
     @staticmethod
     def version_tuple(value):
         numbers = re.findall(r"\d+", str(value))
-        return tuple(int(item) for item in numbers[:3]) or (0,)
+        # Keep every numeric component so hotfix releases such as 1.3.3.1
+        # compare newer than 1.3.3. Truncating to three components made the
+        # updater incorrectly report those releases as already installed.
+        return tuple(int(item) for item in numbers) or (0,)
 
     def check_for_updates(self):
         def worker():

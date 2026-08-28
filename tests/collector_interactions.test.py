@@ -122,6 +122,11 @@ class CollectorInteractionTests(unittest.TestCase):
         self.assertIn('color = GREEN if delta > 0 else RED', helper)
         self.assertIn('return "0", MUTED', helper)
 
+    def test_update_version_comparison_keeps_hotfix_component(self):
+        helper = SOURCE[SOURCE.index("    def version_tuple"):SOURCE.index("    def check_for_updates")]
+        self.assertIn("for item in numbers", helper)
+        self.assertNotIn("numbers[:3]", helper)
+
 
 if __name__ == "__main__":
     unittest.main()
