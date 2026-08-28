@@ -53,6 +53,28 @@ class CollectorParsingTests(unittest.TestCase):
         ], has_aether=False)
         self.assertEqual(result[0], 190_418_686)
 
+    def test_normal_hud_skips_small_formatted_purple_currency(self):
+        result = parse_currency_candidates([
+            ("3,338", 0.99),
+            ("433,589,356", 0.99),
+        ], has_aether=False)
+        self.assertEqual(result[0], 433_589_356)
+
+    def test_normal_hud_skips_purple_currency_when_all_three_are_visible(self):
+        result = parse_currency_candidates([
+            ("3,338", 0.99),
+            ("433,589,356", 0.99),
+            ("433,589,356", 0.99),
+        ], has_aether=False)
+        self.assertEqual(result[0], 433_589_356)
+
+    def test_normal_hud_keeps_regular_two_large_currency_order(self):
+        result = parse_currency_candidates([
+            ("190,418,686", 0.99),
+            ("167,517,846", 0.99),
+        ], has_aether=False)
+        self.assertEqual(result[0], 190_418_686)
+
 
 if __name__ == "__main__":
     unittest.main()

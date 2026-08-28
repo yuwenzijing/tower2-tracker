@@ -26,7 +26,7 @@ except ImportError:  # Parsing-only tests do not need the OCR runtime.
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.3"
+APP_VERSION = "1.3.3.1"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
@@ -435,6 +435,18 @@ def parse_currency_candidates(lines: list[tuple[str, float]], has_aether: bool) 
                 values.append((value, confidence))
     if len(values) < 2:
         return None
+    if not has_aether:
+        # The purple wallet currency sits immediately before kina in the
+        # normal HUD. Once it reaches four digits it also gains a thousands
+        # separator and becomes indistinguishable by syntax alone. If OCR
+        # loses a later counter, the old two-value fallback incorrectly chose
+        # that small first value (for example 3,338 instead of 433,589,356).
+        # Treat only the characteristic small-to-large jump as this layout;
+        # ordinary multi-million kina/bound-currency pairs keep their order.
+        first_value, _ = values[0]
+        second_value, _ = values[1]
+        if 1_000 <= first_value <= 9_999 and second_value >= 1_000_000:
+            return values[1]
     # With aether visible, kina is followed by one counter. In the normal HUD
     # three formatted currencies are shown and kina is the first one. Older
     # code selected the penultimate value for a three-counter HUD, assigning
@@ -932,7 +944,7 @@ class CollectorApp:
 
 if __name__ == "__main__":
     kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.3")
+    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.3.1")
     if kernel32.GetLastError() == 183:
         user32.MessageBoxW(None, "数据采集助手已经在运行。", APP_NAME, 0x40)
         sys.exit(0)
