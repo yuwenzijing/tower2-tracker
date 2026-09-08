@@ -15,6 +15,43 @@ export default {
   }
 };
 
+export class CaptureEventHub {
+  constructor(state) {
+    this.state = state;
+    this.waiters = new Set();
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url);
+    if (request.method === 'POST') {
+      const event = await request.json();
+      const events = await this.state.storage.get('events') || [];
+      const id = Math.max(Date.now(), events.length ? events[events.length - 1].id + 1 : 1);
+      const stored = { ...event, id, createdAt: new Date().toISOString() };
+      events.push(stored);
+      await this.state.storage.put('events', events.slice(-20));
+      for (const notify of this.waiters) notify();
+      this.waiters.clear();
+      return json(stored);
+    }
+    const after = Number(url.searchParams.get('after') || 0);
+    let events = await this.state.storage.get('events') || [];
+    let pending = events.filter(event => event.id > after);
+    const wait = Math.min(25000, Math.max(0, Number(url.searchParams.get('wait') || 0)));
+    if (!pending.length && wait) {
+      await new Promise(resolve => {
+        let timer;
+        const notify = () => { clearTimeout(timer); this.waiters.delete(notify); resolve(); };
+        timer = setTimeout(notify, wait);
+        this.waiters.add(notify);
+      });
+      events = await this.state.storage.get('events') || [];
+      pending = events.filter(event => event.id > after);
+    }
+    return json({ events: pending });
+  }
+}
+
 async function handleSync(request, env) {
   const token = validSyncToken(request.headers.get('X-Sync-Token'));
   if (!token) return json({ error: 'Invalid token' }, 401);
@@ -92,6 +129,10 @@ async function captureEvents(request, env, url) {
   const syncToken = validSyncToken(request.headers.get('X-Sync-Token'));
   if (!syncToken) return json({ error: 'Invalid token' }, 401);
   const after = Number(url.searchParams.get('after') || 0);
+  if (env.CAPTURE_EVENTS) {
+    const stub = env.CAPTURE_EVENTS.get(env.CAPTURE_EVENTS.idFromName(syncToken));
+    return stub.fetch('https://capture-events.local/?after=' + after + '&wait=25000');
+  }
   const events = await env.SYNC_KV.get(eventKey(syncToken), 'json') || [];
   return json({ events: events.filter(event => event.id > after) });
 }
@@ -220,6 +261,7 @@ async function createCharacter(request, env, device) {
     id: Date.now().toString(36) + randomHex(3), name, charClass: '', whiteEnergy: 0, whiteTimestamp: null,
     blueEnergy: 0, blueBackpackLarge: null, blueBackpackSmall: null, awakeningDone: null, abyssDone: null,
     sanctuary1Done: null, sanctuary2Done: null, sanctuary3Done: null, shopDone: null, transformDone: null,
+    sanctuary1Name: null, sanctuary2Name: null, sanctuary3Name: null,
     trialDone: null, trialLv: 0, itemLevel: null, combatPower: null, kina: null
   };
   account.characters = account.characters || [];
@@ -263,6 +305,13 @@ async function readCloud(env, token) { return await env.SYNC_KV.get(token, 'json
 async function writeCloud(env, token, cloud) { await env.SYNC_KV.put(token, JSON.stringify(cloud), { expirationTtl: SYNC_TTL }); }
 function eventKey(token) { return 'capture:events:' + token; }
 async function appendEvent(env, token, event) {
+  if (env.CAPTURE_EVENTS) {
+    const stub = env.CAPTURE_EVENTS.get(env.CAPTURE_EVENTS.idFromName(token));
+    await stub.fetch('https://capture-events.local/', {
+      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(event)
+    });
+    return;
+  }
   const key = eventKey(token);
   const events = await env.SYNC_KV.get(key, 'json') || [];
   const id = Math.max(Date.now(), events.length ? events[events.length - 1].id + 1 : 1);

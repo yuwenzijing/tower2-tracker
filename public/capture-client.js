@@ -81,7 +81,7 @@
       var response = await fetch(API + '/pair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Sync-Token': token },
-        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.4.1-test' : 'web-v1.3.4.1' })
+        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.4.2-test' : 'web-v1.3.4.2' })
       });
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
@@ -114,9 +114,17 @@
     localStorage.setItem(LAST_EVENT_KEY, String(id));
   }
 
+  var pollInFlight = false;
+  var pollStopped = false;
+
   async function pollCaptureEvents() {
+    if (pollInFlight || pollStopped) return;
     var passphrase = typeof getSyncPassphrase === 'function' ? getSyncPassphrase() : null;
-    if (!passphrase || document.hidden) return;
+    if (!passphrase || document.hidden) {
+      setTimeout(pollCaptureEvents, 1000);
+      return;
+    }
+    pollInFlight = true;
     try {
       var token = await hashPassphrase(passphrase);
       var response = await fetch(API + '/events?after=' + latestEventId(), {
@@ -127,6 +135,9 @@
       (result.events || []).forEach(applyCaptureEvent);
     } catch (error) {
       console.warn('capture event poll failed', error);
+    } finally {
+      pollInFlight = false;
+      if (!pollStopped) setTimeout(pollCaptureEvents, 100);
     }
   }
 
@@ -174,7 +185,7 @@
 
   injectStyles();
   injectModal();
-  pollTimer = setInterval(pollCaptureEvents, 2000);
+  pollCaptureEvents();
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden) pollCaptureEvents();
   });

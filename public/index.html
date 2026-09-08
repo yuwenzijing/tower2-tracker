@@ -1082,7 +1082,108 @@
     padding: 10px 14px;
     border-top: 1px solid var(--glass-border);
   }
-  .todo-section.sanctuary-row { border-top: none; }
+  .todo-section.sanctuary-row {
+    position: relative;
+    z-index: 60;
+    overflow: visible;
+    border-top: none;
+  }
+  .todo-item.sanctuary-slot {
+    position: relative;
+    display: grid;
+    grid-template-columns: 16px minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 5px 10px;
+    overflow: visible;
+  }
+  .account-card.sanctuary-menu-open { position: relative; z-index: 40; overflow: visible; }
+  .char-card.sanctuary-menu-open { position: relative; z-index: 50; overflow: visible; }
+  .todo-item.sanctuary-slot.empty { cursor: default; }
+  .sanctuary-trigger {
+    display: block;
+    align-items: center;
+    width: 100%;
+    height: auto;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font: 600 12px/1.4 "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    text-align: left;
+    cursor: pointer;
+    padding: 0 30px 0 0;
+  }
+  .sanctuary-trigger:hover, .sanctuary-trigger:focus-visible { color: var(--text); }
+  .sanctuary-trigger:focus-visible { box-shadow: inset 0 0 0 1px var(--cyan); border-radius: 7px; }
+  .sanctuary-slot.done .sanctuary-trigger { color: var(--green); }
+  .sanctuary-trigger-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sanctuary-clear, .sanctuary-option-check {
+    font-family: "Segoe MDL2 Assets";
+    font-weight: 400;
+  }
+  .sanctuary-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 70;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #7890ad;
+    opacity: .48;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    box-shadow: none;
+    transition: color .16s ease, opacity .16s ease, background .16s ease;
+  }
+  .sanctuary-clear:hover, .sanctuary-clear:focus-visible {
+    color: #ff8192;
+    opacity: 1;
+    background: rgba(255,97,118,.08);
+    outline: none;
+  }
+  .sanctuary-menu {
+    position: absolute;
+    z-index: 100;
+    top: calc(100% + 6px);
+    left: 10px;
+    right: 0;
+    padding: 5px;
+    border: 1px solid rgba(70,108,150,.72);
+    border-radius: 9px;
+    background: #0a1729;
+    box-shadow: 0 14px 32px rgba(0,0,0,.5), 0 0 0 1px rgba(34,221,255,.05);
+  }
+  .sanctuary-option {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16px;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 9px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #b8c8dc;
+    font: 600 12px/1.25 "PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;
+    text-align: left;
+    cursor: pointer;
+  }
+  .sanctuary-option:hover, .sanctuary-option:focus-visible {
+    color: #e7f8ff;
+    background: rgba(34,221,255,.1);
+    outline: none;
+  }
+  .sanctuary-option.selected { color: var(--green); background: rgba(90,232,144,.08); }
+  .sanctuary-option-check { color: var(--green); font-size: 11px; text-align: center; }
   .todo-subtitle {
     height: 31px;
     padding: 0 14px;
@@ -1850,7 +1951,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.4.1</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.4.2</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -2462,6 +2563,105 @@ var TODO_CONFIG = {
   trial:      { field: 'trialDone',      resetFn: getWeeklyResetPoint },
 };
 
+var SANCTUARY_OPTIONS = ['卢德莱', '侵蚀净化所', '穆斯费尔圣杯', '悲叹雪原'];
+var SANCTUARY_SLOTS = [
+  { key: 'sanctuary1', nameField: 'sanctuary1Name', defaultName: '卢德莱' },
+  { key: 'sanctuary2', nameField: 'sanctuary2Name', defaultName: '侵蚀净化所' },
+  { key: 'sanctuary3', nameField: 'sanctuary3Name', defaultName: '穆斯费尔圣杯' }
+];
+var openSanctuaryDropdown = null;
+
+function sanctuaryWeekId() {
+  return getWeeklyResetPoint().toISOString();
+}
+
+function ensureSanctuaryWeek(ch) {
+  var resetPoint = getWeeklyResetPoint();
+  var weekId = resetPoint.toISOString();
+  var trackedWeek = Date.parse(ch.sanctuaryWeek || '');
+  var changed = false;
+  if (!Number.isFinite(trackedWeek) || trackedWeek < resetPoint.getTime()) {
+    SANCTUARY_SLOTS.forEach(function(slot) {
+      if (!ch.sanctuaryWeek && ch[slot.nameField] !== undefined && isTodoDone(ch, slot.key)) return;
+      if (ch[slot.nameField] !== null) changed = true;
+      ch[slot.nameField] = null;
+      ch[TODO_CONFIG[slot.key].field] = null;
+    });
+    ch.sanctuaryWeek = weekId;
+    changed = true;
+  }
+  return changed;
+}
+
+function sanctuaryOptionsFor(ch, slotKey) {
+  var current = SANCTUARY_SLOTS.find(function(slot) { return slot.key === slotKey; });
+  var selectedElsewhere = SANCTUARY_SLOTS
+    .filter(function(slot) { return slot.key !== slotKey; })
+    .map(function(slot) { return ch[slot.nameField]; })
+    .filter(Boolean);
+  return SANCTUARY_OPTIONS.filter(function(name) {
+    return current && (name === ch[current.nameField] || selectedElsewhere.indexOf(name) === -1);
+  });
+}
+
+function setSanctuarySelection(accId, charId, slotKey, value) {
+  var r = findChar(accId, charId); if (!r) return;
+  var slot = SANCTUARY_SLOTS.find(function(item) { return item.key === slotKey; });
+  if (!slot) return;
+  var next = SANCTUARY_OPTIONS.indexOf(value) >= 0 ? value : null;
+  var duplicate = SANCTUARY_SLOTS.some(function(item) {
+    return item.key !== slotKey && r.ch[item.nameField] === next;
+  });
+  if (next && duplicate) return;
+  if (r.ch[slot.nameField] === next && isTodoDone(r.ch, slotKey)) return;
+  pushUndo();
+  r.ch[slot.nameField] = next;
+  r.ch[TODO_CONFIG[slotKey].field] = next ? new Date().toISOString() : null;
+  r.ch.sanctuaryWeek = sanctuaryWeekId();
+  openSanctuaryDropdown = null;
+  saveData(); render();
+}
+
+function clearSanctuarySelection(accId, charId, slotKey) {
+  setSanctuarySelection(accId, charId, slotKey, '');
+}
+
+function toggleSanctuaryDropdown(accId, charId, slotKey) {
+  var isSame = openSanctuaryDropdown && openSanctuaryDropdown.accId === accId &&
+    openSanctuaryDropdown.charId === charId && openSanctuaryDropdown.slotKey === slotKey;
+  openSanctuaryDropdown = isSame ? null : { accId: accId, charId: charId, slotKey: slotKey };
+  render();
+}
+
+document.addEventListener('click', function() {
+  if (!openSanctuaryDropdown) return;
+  openSanctuaryDropdown = null;
+  document.querySelectorAll('.sanctuary-slot.open').forEach(function(slot) {
+    slot.classList.remove('open');
+    var trigger = slot.querySelector('.sanctuary-trigger');
+    var menu = slot.querySelector('.sanctuary-menu');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    if (menu) menu.remove();
+  });
+});
+
+function renderSanctuarySlot(acc, ch, slot, done) {
+  var selected = ch[slot.nameField] || '';
+  var options = sanctuaryOptionsFor(ch, slot.key);
+  var isOpen = !!(openSanctuaryDropdown && openSanctuaryDropdown.accId === acc.id &&
+    openSanctuaryDropdown.charId === ch.id && openSanctuaryDropdown.slotKey === slot.key);
+  return '<div class="todo-item sanctuary-slot ' + (done ? 'done ' : '') + (!selected ? 'empty ' : '') + (isOpen ? 'open' : '') + '" data-todo="' + slot.key + '">' +
+      '<span class="todo-checkbox" aria-hidden="true">' + (done ? '✓' : '') + '</span>' +
+      '<button class="sanctuary-trigger" type="button" onclick="event.stopPropagation();toggleSanctuaryDropdown(\'' + acc.id + '\',\'' + ch.id + '\',\'' + slot.key + '\')" aria-expanded="' + isOpen + '" aria-haspopup="listbox" aria-label="圣域项目 ' + (SANCTUARY_SLOTS.indexOf(slot) + 1) + '">' +
+        '<span class="sanctuary-trigger-label">' + (selected || '请选择') + '</span>' +
+      '</button>' +
+      (selected ? '<button class="sanctuary-clear" type="button" onclick="event.stopPropagation();clearSanctuarySelection(\'' + acc.id + '\',\'' + ch.id + '\',\'' + slot.key + '\')" title="清空当前选项" aria-label="清空当前圣域项目">&#xE711;</button>' : '') +
+      (isOpen ? '<div class="sanctuary-menu" role="listbox" aria-label="圣域候选项目">' + options.map(function(name) {
+        return '<button class="sanctuary-option ' + (name === selected ? 'selected' : '') + '" type="button" role="option" aria-selected="' + (name === selected) + '" onclick="event.stopPropagation();setSanctuarySelection(\'' + acc.id + '\',\'' + ch.id + '\',\'' + slot.key + '\',\'' + name + '\')"><span>' + name + '</span>' + (name === selected ? '<span class="sanctuary-option-check" aria-hidden="true">&#xE73E;</span>' : '<span></span>') + '</button>';
+      }).join('') + '</div>' : '') +
+    '</div>';
+}
+
 function isTodoDone(ch, key) {
   var cfg = TODO_CONFIG[key];
   if (!cfg || !ch[cfg.field]) return false;
@@ -2568,6 +2768,10 @@ function ensureCharDefaults(ch) {
   if (ch.sanctuary1Done === undefined) ch.sanctuary1Done = null;
   if (ch.sanctuary2Done === undefined) ch.sanctuary2Done = null;
   if (ch.sanctuary3Done === undefined) ch.sanctuary3Done = null;
+  if (ch.sanctuary1Name === undefined) ch.sanctuary1Name = isTodoDone(ch, 'sanctuary1') ? '卢德莱' : null;
+  if (ch.sanctuary2Name === undefined) ch.sanctuary2Name = isTodoDone(ch, 'sanctuary2') ? '侵蚀净化所' : null;
+  if (ch.sanctuary3Name === undefined) ch.sanctuary3Name = isTodoDone(ch, 'sanctuary3') ? '穆斯费尔圣杯' : null;
+  ensureSanctuaryWeek(ch);
   if (ch.shopDone === undefined) ch.shopDone = null;
   if (ch.transformDone === undefined) ch.transformDone = null;
   if (ch.trialDone === undefined) ch.trialDone = null;
@@ -2674,6 +2878,10 @@ function addCharacter(accId, withRender = true) {
     sanctuary1Done: null,
     sanctuary2Done: null,
     sanctuary3Done: null,
+    sanctuary1Name: null,
+    sanctuary2Name: null,
+    sanctuary3Name: null,
+    sanctuaryWeek: sanctuaryWeekId(),
     shopDone: null,
     transformDone: null,
     trialDone: null,
@@ -2963,7 +3171,7 @@ function render() {
 
   DATA.accounts.forEach((acc, idx) => {
     const card = document.createElement('div');
-    card.className = 'account-card';
+    card.className = 'account-card' + (openSanctuaryDropdown && openSanctuaryDropdown.accId === acc.id ? ' sanctuary-menu-open' : '');
     const mem = getMem(acc);
     const memRemaining = calcMembershipRemaining(acc);
     const memDays = memRemaining.days;
@@ -3047,9 +3255,9 @@ function render() {
         const dungeonRuns = calcDungeonRuns(acc, ch);
         const awDone = isTodoDone(ch, 'awakening');
         const abDone = isTodoDone(ch, 'abyss');
-        const s1Done = isTodoDone(ch, 'sanctuary1');
-        const s2Done = isTodoDone(ch, 'sanctuary2');
-        const s3Done = isTodoDone(ch, 'sanctuary3');
+        const s1Done = !!ch.sanctuary1Name && isTodoDone(ch, 'sanctuary1');
+        const s2Done = !!ch.sanctuary2Name && isTodoDone(ch, 'sanctuary2');
+        const s3Done = !!ch.sanctuary3Name && isTodoDone(ch, 'sanctuary3');
         const shopDone = isTodoDone(ch, 'shop');
         const tfDone = isTodoDone(ch, 'transform');
         const trialDone = isTodoDone(ch, 'trial');
@@ -3057,7 +3265,8 @@ function render() {
         const todoCountClass = todoCount === 8 ? 'all' : todoCount === 0 ? 'none' : 'partial';
         const blueBd = calcBlueBreakdown(ch);
         const charCard = document.createElement('div');
-        charCard.className = 'char-card' + (ch.charClass ? ' cls-' + ch.charClass : '') + (isCharSelected(acc.id, ch.id) ? ' selected' : '');
+        charCard.className = 'char-card' + (ch.charClass ? ' cls-' + ch.charClass : '') + (isCharSelected(acc.id, ch.id) ? ' selected' : '') +
+          (openSanctuaryDropdown && openSanctuaryDropdown.accId === acc.id && openSanctuaryDropdown.charId === ch.id ? ' sanctuary-menu-open' : '');
         charCard.id = `char-${acc.id}-${ch.id}`;
         charCard.ondragover = (e) => onCharDragOver(e, acc.id);
         charCard.ondragleave = onCharDragLeave;
@@ -3169,18 +3378,9 @@ function render() {
             ${noteHtml}
           </div>
           <div class="todo-section sanctuary-row">
-            <div class="todo-item ${s1Done?'done':''}" data-todo="sanctuary1" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary1')" title="点击切换完成状态">
-              <div class="todo-checkbox">${s1Done?'✓':''}</div>
-              <span class="todo-label">卢德莱</span>
-            </div>
-            <div class="todo-item ${s2Done?'done':''}" data-todo="sanctuary2" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary2')" title="点击切换完成状态">
-              <div class="todo-checkbox">${s2Done?'✓':''}</div>
-              <span class="todo-label">侵蚀净化所</span>
-            </div>
-            <div class="todo-item ${s3Done?'done':''}" data-todo="sanctuary3" onclick="toggleTodo('${acc.id}','${ch.id}','sanctuary3')" title="点击切换完成状态">
-              <div class="todo-checkbox">${s3Done?'✓':''}</div>
-              <span class="todo-label">穆斯费尔圣杯</span>
-            </div>
+            ${renderSanctuarySlot(acc, ch, SANCTUARY_SLOTS[0], s1Done)}
+            ${renderSanctuarySlot(acc, ch, SANCTUARY_SLOTS[1], s2Done)}
+            ${renderSanctuarySlot(acc, ch, SANCTUARY_SLOTS[2], s3Done)}
           </div>
           <div class="todo-section">
             <div class="todo-item ${awDone?'done':''}" data-todo="awakening" onclick="toggleTodo('${acc.id}','${ch.id}','awakening')" title="点击切换完成状态">
@@ -3253,12 +3453,14 @@ function render() {
 // 实时更新（不重渲染整页）
 function updateRecoveryDisplay() {
   let todoChanged = false;
+  let sanctuaryResetChanged = false;
   DATA.accounts.forEach(acc => {
     DIRECTIVE_ITEMS.forEach(function(d) {
       var el = document.querySelector('.directive-item[onclick*="' + d.key + '"]');
       if (el && el.classList.contains('done') !== isDirectiveDone(acc, d.key)) todoChanged = true;
     });
     acc.characters.forEach(ch => {
+      if (ensureSanctuaryWeek(ch)) sanctuaryResetChanged = true;
       const charCard = document.getElementById(`char-${acc.id}-${ch.id}`);
       if (!charCard) return;
       const todoItems = charCard.querySelectorAll('.todo-item[data-todo]');
@@ -3268,6 +3470,7 @@ function updateRecoveryDisplay() {
       });
     });
   });
+  if (sanctuaryResetChanged) { saveData(); render(); return; }
   if (todoChanged) { render(); return; }
 
   // 更新白奥德输入值和副本次数
@@ -4147,7 +4350,7 @@ setInterval(updateRecoveryDisplay, 30000);
 <script>
 if (location.hostname === 'test.buyali.xyz') {
   const versionTag = document.getElementById('appVersionTag');
-  if (versionTag) versionTag.textContent = 'V1.3.4.1-test';
+  if (versionTag) versionTag.textContent = 'V1.3.4.2-test';
 }
 </script>
 </body>

@@ -8,3 +8,11 @@ directory = "./public"
 [[kv_namespaces]]
 binding = "SYNC_KV"
 id = "a820fd79771d44e4af9f83243556e101"
+
+[[durable_objects.bindings]]
+name = "CAPTURE_EVENTS"
+class_name = "CaptureEventHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["CaptureEventHub"]
