@@ -11,8 +11,12 @@ id = "a820fd79771d44e4af9f83243556e101"
 
 [[durable_objects.bindings]]
 name = "CAPTURE_EVENTS"
-class_name = "CaptureEventHub"
+class_name = "CaptureEventHubV2"
 
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["CaptureEventHub"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["CaptureEventHubV2"]

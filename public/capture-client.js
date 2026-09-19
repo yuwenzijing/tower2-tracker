@@ -81,7 +81,7 @@
       var response = await fetch(API + '/pair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Sync-Token': token },
-        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.4.2-test' : 'web-v1.3.4.2' })
+        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.4.3-test' : 'web-v1.3.4.3' })
       });
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));

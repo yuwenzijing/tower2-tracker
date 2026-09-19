@@ -17,7 +17,9 @@ export default {
 
 export class CaptureEventHub {
   constructor(state) {
-    this.state = state;
+    // Keep the storage handle directly. This is the Durable Object pattern
+    // supported by both the legacy class API and current Workers runtime.
+    this.storage = state.storage;
     this.waiters = new Set();
   }
 
@@ -25,17 +27,17 @@ export class CaptureEventHub {
     const url = new URL(request.url);
     if (request.method === 'POST') {
       const event = await request.json();
-      const events = await this.state.storage.get('events') || [];
+      const events = await this.storage.get('events') || [];
       const id = Math.max(Date.now(), events.length ? events[events.length - 1].id + 1 : 1);
       const stored = { ...event, id, createdAt: new Date().toISOString() };
       events.push(stored);
-      await this.state.storage.put('events', events.slice(-20));
+      await this.storage.put('events', events.slice(-20));
       for (const notify of this.waiters) notify();
       this.waiters.clear();
       return json(stored);
     }
     const after = Number(url.searchParams.get('after') || 0);
-    let events = await this.state.storage.get('events') || [];
+    let events = await this.storage.get('events') || [];
     let pending = events.filter(event => event.id > after);
     const wait = Math.min(25000, Math.max(0, Number(url.searchParams.get('wait') || 0)));
     if (!pending.length && wait) {
@@ -45,12 +47,17 @@ export class CaptureEventHub {
         timer = setTimeout(notify, wait);
         this.waiters.add(notify);
       });
-      events = await this.state.storage.get('events') || [];
+      events = await this.storage.get('events') || [];
       pending = events.filter(event => event.id > after);
     }
     return json({ events: pending });
   }
 }
+
+// V2 uses a fresh Durable Object class/migration. The original event hub is
+// retained for existing deployments, while new requests avoid any poisoned
+// instance state from the previous class registration.
+export class CaptureEventHubV2 extends CaptureEventHub {}
 
 async function handleSync(request, env) {
   const token = validSyncToken(request.headers.get('X-Sync-Token'));
@@ -130,11 +137,16 @@ async function captureEvents(request, env, url) {
   if (!syncToken) return json({ error: 'Invalid token' }, 401);
   const after = Number(url.searchParams.get('after') || 0);
   if (env.CAPTURE_EVENTS) {
-    const stub = env.CAPTURE_EVENTS.get(env.CAPTURE_EVENTS.idFromName(syncToken));
-    return stub.fetch('https://capture-events.local/?after=' + after + '&wait=25000');
+    try {
+      const stub = env.CAPTURE_EVENTS.get(env.CAPTURE_EVENTS.idFromName(syncToken));
+      const response = await stub.fetch('https://capture-events.local/?after=' + after + '&wait=25000');
+      if (response.ok) return response;
+      console.error('Capture event hub read failed:', response.status);
+    } catch (error) {
+      console.error('Capture event hub read threw:', error && error.message ? error.message : error);
+    }
   }
-  const events = await env.SYNC_KV.get(eventKey(syncToken), 'json') || [];
-  return json({ events: events.filter(event => event.id > after) });
+  return readFallbackEvents(env, syncToken, after, 25000);
 }
 
 async function deviceState(env, device) {
@@ -306,12 +318,34 @@ async function writeCloud(env, token, cloud) { await env.SYNC_KV.put(token, JSON
 function eventKey(token) { return 'capture:events:' + token; }
 async function appendEvent(env, token, event) {
   if (env.CAPTURE_EVENTS) {
-    const stub = env.CAPTURE_EVENTS.get(env.CAPTURE_EVENTS.idFromName(token));
-    await stub.fetch('https://capture-events.local/', {
-      method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(event)
-    });
-    return;
+    try {
+      const stub = env.CAPTURE_EVENTS.get(env.CAPTURE_EVENTS.idFromName(token));
+      const response = await stub.fetch('https://capture-events.local/', {
+        method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(event)
+      });
+      if (response.ok) return;
+      console.error('Capture event hub write failed:', response.status);
+    } catch (error) {
+      // Cloud data has already been persisted. Never turn a successful capture
+      // into a 500 merely because the notification channel is unavailable.
+      console.error('Capture event hub write threw:', error && error.message ? error.message : error);
+    }
   }
+  await appendFallbackEvent(env, token, event);
+}
+
+async function readFallbackEvents(env, token, after, waitMs = 0) {
+  const key = eventKey(token);
+  const deadline = Date.now() + Math.max(0, waitMs);
+  while (true) {
+    const events = await env.SYNC_KV.get(key, 'json') || [];
+    const pending = events.filter(event => event.id > after);
+    if (pending.length || Date.now() >= deadline) return json({ events: pending });
+    await new Promise(resolve => setTimeout(resolve, Math.min(250, deadline - Date.now())));
+  }
+}
+
+async function appendFallbackEvent(env, token, event) {
   const key = eventKey(token);
   const events = await env.SYNC_KV.get(key, 'json') || [];
   const id = Math.max(Date.now(), events.length ? events[events.length - 1].id + 1 : 1);
