@@ -1401,6 +1401,26 @@
   }
   .empty-state .emoji { font-size: 48px; margin-bottom: 12px; }
   .empty-state p { font-size: 14px; margin-bottom: 16px; }
+  .empty-state .empty-state-hint {
+    max-width: 460px;
+    margin: -4px auto 18px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .empty-state .empty-state-action {
+    padding: 9px 18px;
+    border: 1px solid rgba(48, 214, 255, 0.42);
+    border-radius: 8px;
+    background: rgba(0, 202, 255, 0.09);
+    color: var(--cyan);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .empty-state .empty-state-action:hover {
+    background: rgba(0, 202, 255, 0.16);
+    border-color: var(--cyan);
+  }
 
   /* ===== Add Account ===== */
   .add-account-btn {
@@ -1951,7 +1971,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.4.3</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.4.4</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -3159,10 +3179,14 @@ function render() {
   list.innerHTML = '';
 
   if (DATA.accounts.length === 0) {
+    const canRestoreFromCloud = !getSyncPassphrase() && location.protocol !== 'file:';
     list.innerHTML = `
       <div class="empty-state">
         <div class="emoji">🔮</div>
-        <p>还没有账号，点击下方添加开始追踪奥德</p>
+        <p>${canRestoreFromCloud ? '此浏览器暂未找到账号数据' : '还没有账号，点击下方添加开始追踪奥德'}</p>
+        ${canRestoreFromCloud ? `
+          <p class="empty-state-hint">账号数据保存在各浏览器独立的本地空间。若您已在其他浏览器启用云同步，请输入相同的同步口令恢复数据；也可以从原浏览器导出后在此导入。</p>
+          <button class="empty-state-action" onclick="openSyncModal()">☁ 从云端恢复数据</button>` : ''}
       </div>`;
     updateSummary();
     updateGlobalUndoBtn();
@@ -4350,7 +4374,7 @@ setInterval(updateRecoveryDisplay, 30000);
 <script>
 if (location.hostname === 'test.buyali.xyz') {
   const versionTag = document.getElementById('appVersionTag');
-  if (versionTag) versionTag.textContent = 'V1.3.4.3-test';
+  if (versionTag) versionTag.textContent = 'V1.3.4.4-test';
 }
 </script>
 </body>
