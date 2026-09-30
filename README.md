@@ -4,7 +4,7 @@ Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。
 
 当前正式网页版本：`V1.3.5`
 
-V1.3.5 已完成测试环境验收并正式发布。
+V1.3.5 已于 2026-09-30 完成测试环境验收并正式发布。
 
 - 正式网站：[https://buyali.xyz](https://buyali.xyz)
 - 最新版本：[GitHub Release V1.3.5](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.5)
