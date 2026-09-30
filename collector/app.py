@@ -19,6 +19,7 @@ from urllib.request import Request, urlopen
 
 import numpy as np
 from PIL import Image, ImageEnhance, ImageGrab
+from combat_power import parse_combat_power
 try:
     from rapidocr_onnxruntime import RapidOCR
 except ImportError:  # Parsing-only tests do not need the OCR runtime.
@@ -26,7 +27,7 @@ except ImportError:  # Parsing-only tests do not need the OCR runtime.
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.4.1"
+APP_VERSION = "1.3.5"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
@@ -600,17 +601,19 @@ def recognize(image: Image.Image) -> tuple[dict, dict]:
     combat_candidates, item_candidates = [], []
     for text, confidence in stat_lines:
         clean = re.sub(r"\s+", "", text)
-        combat = re.fullmatch(r"(\d{1,3}(?:\.\d{1,2})?)[Kk]", clean)
+        combat = parse_combat_power(clean)
         if combat:
-            combat_candidates.append((float(combat.group(1)), confidence))
+            value, unit = combat
+            combat_candidates.append((value, unit, confidence))
             continue
         if re.fullmatch(r"\d{1,2},\d{3}|\d{3,4}", clean):
             value = integer(clean)
             if value is not None and 100 <= value <= 9999:
                 item_candidates.append((value, confidence, "," in clean))
     if combat_candidates:
-        value, confidence = max(combat_candidates, key=lambda item: item[1])
-        fields["combatPower"], scores["combatPower"] = round(value, 2), min(99, confidence * 100)
+        value, unit, confidence = max(combat_candidates, key=lambda item: item[2])
+        fields["combatPower"], scores["combatPower"] = value, min(99, confidence * 100)
+        fields["combatPowerUnit"] = unit
     elif item_candidates:
         value, confidence, _ = max(item_candidates, key=lambda item: (item[2], item[1]))
         fields["itemLevel"], scores["itemLevel"] = value, min(99, confidence * 100)
@@ -734,7 +737,8 @@ class CollectorApp:
         self.root.after(350, self.follow_game)
 
     def pair(self):
-        code = simpledialog.askstring(APP_NAME, "请在 buyali.xyz 点击“数据采集”，输入显示的 6 位配对码：", parent=self.root)
+        domain = "test.buyali.xyz" if IS_TEST_BUILD else "buyali.xyz"
+        code = simpledialog.askstring(APP_NAME, f"请在 {domain} 点击“数据采集”，输入显示的 6 位配对码：", parent=self.root)
         if not code:
             return
         try:
@@ -963,7 +967,7 @@ class CollectorApp:
 
 if __name__ == "__main__":
     kernel32 = ctypes.windll.kernel32
-    mutex = kernel32.CreateMutexW(None, False, "Local\\BuyaliCollector-1.3.4.1")
+    mutex = kernel32.CreateMutexW(None, False, f"Local\\BuyaliCollector-{APP_VERSION}")
     if kernel32.GetLastError() == 183:
         user32.MessageBoxW(None, "数据采集助手已经在运行。", APP_NAME, 0x40)
         sys.exit(0)

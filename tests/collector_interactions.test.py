@@ -1,10 +1,13 @@
 import unittest
 from pathlib import Path
+import sys
 
 
 SOURCE = (Path(__file__).resolve().parents[1] / "collector" / "main.py").read_text(encoding="utf-8")
 APP_SOURCE = (Path(__file__).resolve().parents[1] / "collector" / "app.py").read_text(encoding="utf-8")
 WORKER_SOURCE = (Path(__file__).resolve().parents[1] / "src" / "index.js").read_text(encoding="utf-8")
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "collector"))
+from combat_power import format_combat_power
 
 
 class CollectorInteractionTests(unittest.TestCase):
@@ -111,7 +114,12 @@ class CollectorInteractionTests(unittest.TestCase):
         confirm = SOURCE[SOURCE.index("    def confirm_dialog"):SOURCE.index("    def rebind_for_capture")]
         self.assertIn('make_dialog("确认采集内容", 620', confirm)
         self.assertIn('("数据项", "变更前", "变更后", "变化")', confirm)
-        self.assertIn("format_change(key, before, after)", confirm)
+        self.assertIn("format_change(key, before, after, before_unit, after_unit)", confirm)
+        self.assertNotIn('values=("K", "M")', confirm)
+        self.assertIn('entry_text = format_combat_power(value, combat_unit["value"])', confirm)
+        self.assertIn('value.replace(",", "").strip().rstrip("KkMm")', confirm)
+        self.assertIn('text = format_combat_delta(magnitude)', SOURCE)
+        self.assertIn('edited["combatPowerUnit"] = combat_unit["value"]', confirm)
         self.assertNotIn("可信度", confirm)
         self.assertIn('"fields": edited', confirm)
         self.assertIn("args=(payload, edited, game.character, serial)", confirm)
@@ -121,6 +129,13 @@ class CollectorInteractionTests(unittest.TestCase):
         self.assertIn('sign = "+" if delta > 0 else "-"', helper)
         self.assertIn('color = GREEN if delta > 0 else RED', helper)
         self.assertIn('return "0", MUTED', helper)
+
+    def test_m_value_rendered_for_confirmation_parses_as_float(self):
+        confirm = SOURCE[SOURCE.index("    def confirm_dialog"):SOURCE.index("    def rebind_for_capture")]
+        self.assertIn('clean = value.replace(",", "").strip().rstrip("KkMm")', confirm)
+        rendered = format_combat_power(1.036, "M")
+        self.assertEqual(rendered, "1.036M")
+        self.assertEqual(round(float(rendered.rstrip("KkMm")), 3), 1.036)
 
     def test_update_version_comparison_keeps_hotfix_component(self):
         helper = SOURCE[SOURCE.index("    def version_tuple"):SOURCE.index("    def check_for_updates")]

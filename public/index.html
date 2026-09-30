@@ -855,6 +855,9 @@
     align-items: center;
     flex-shrink: 0;
   }
+  .stat-group .combat-unit-select { display: none !important; }
+  .stat-group.editing .combat-unit-select { display: inline-block !important; }
+  .stat-group.editing .combat-unit-label { display: none; }
   .stat-input {
     background: transparent;
     border: none;
@@ -877,6 +880,14 @@
     font-size: 11px;
     font-weight: 700;
     color: var(--text-faint);
+  }
+  select.stat-suffix {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    margin-left: 2px;
+    cursor: pointer;
+    font-family: inherit;
   }
 
   /* ===== Character Subtitle (Dungeon Count) ===== */
@@ -1971,7 +1982,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.4.4</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.5</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -2800,6 +2811,8 @@ function ensureCharDefaults(ch) {
   if (ch.trialLv === undefined) ch.trialLv = 0;
   if (ch.itemLevel === undefined) ch.itemLevel = null;
   if (ch.combatPower === undefined) ch.combatPower = null;
+  var combatPowerUnit = String(ch.combatPowerUnit || 'K').toUpperCase();
+  ch.combatPowerUnit = ['K', 'M'].includes(combatPowerUnit) ? combatPowerUnit : 'K';
   if (ch.kina === undefined) ch.kina = null;
   if (ch.note === undefined) ch.note = '';
 }
@@ -2908,6 +2921,7 @@ function addCharacter(accId, withRender = true) {
     trialLv: 0,
     itemLevel: null,
     combatPower: null,
+    combatPowerUnit: 'K',
     kina: null,
     note: '',
   });
@@ -2946,12 +2960,29 @@ function setItemLevel(accId, charId, val) {
   r.ch.itemLevel = (isNaN(n) || n <= 0) ? null : Math.min(n, 6500);
   saveData(); render();
 }
-function setCombatPower(accId, charId, val) {
+function setCombatPower(accId, charId, val, unit) {
   var r = findChar(accId, charId); if (!r) return;
   pushUndo();
   var n = parseFloat(val);
-  r.ch.combatPower = (isNaN(n) || n <= 0) ? null : Math.min(Math.round(n * 10) / 10, 1000);
+  unit = String(unit || r.ch.combatPowerUnit || 'K').toUpperCase();
+  if (!['K', 'M'].includes(unit)) unit = 'K';
+  r.ch.combatPower = (isNaN(n) || n <= 0) ? null : Math.round(n * (unit === 'M' ? 1000 : 10)) / (unit === 'M' ? 1000 : 10);
+  r.ch.combatPowerUnit = unit;
   saveData(); render();
+}
+function changeCombatPowerUnit(accId, charId, unit) {
+  var r = findChar(accId, charId); if (!r) return;
+  var oldUnit = String(r.ch.combatPowerUnit || 'K').toUpperCase();
+  unit = String(unit || 'K').toUpperCase();
+  if (!['K', 'M'].includes(unit) || unit === oldUnit) return;
+  var value = Number(r.ch.combatPower);
+  if (Number.isFinite(value) && value > 0) {
+    var converted = value * (oldUnit === 'M' ? 1000 : 1) / (unit === 'M' ? 1000 : 1);
+    setCombatPower(accId, charId, Math.round(converted * (unit === 'M' ? 1000 : 10)) / (unit === 'M' ? 1000 : 10), unit);
+  } else {
+    r.ch.combatPowerUnit = unit;
+    saveData(); render();
+  }
 }
 
 // 能量填写（clamp到上限）
@@ -3353,11 +3384,13 @@ function render() {
                   title="道具等级 (上限6500)" />
               </div>
               <div class="stat-group">
-                <input class="stat-input" type="number" step="0.1" value="${ch.combatPower||''}" placeholder="战力"
-                  style="${ch.combatPower ? 'color:'+getRatioColor(ch.combatPower,1000) : ''}"
-                  onchange="setCombatPower('${acc.id}','${ch.id}',this.value)"
-                  oninput="updateStatColor(this, this.value, 1000)"
-                  title="战斗力 (k值, 上限1000k=100万, 支持小数)" /><span class="stat-suffix" style="${ch.combatPower ? 'color:'+getRatioColor(ch.combatPower,1000) : ''}">K</span>
+                <input class="stat-input" type="number" step="${(ch.combatPowerUnit||'K')==='M'?'0.001':'0.1'}" value="${ch.combatPower||''}" placeholder="战力"
+                  style="${ch.combatPower ? 'color:'+getRatioColor(Math.min(ch.combatPower * ((ch.combatPowerUnit||'K')==='M'?1000:1),1000),1000) : ''}"
+                  onchange="setCombatPower('${acc.id}','${ch.id}',this.value,'${ch.combatPowerUnit||'K'}')"
+                    onfocus="this.parentElement.classList.add('editing')"
+                    onblur="if (!this.parentElement.contains(event.relatedTarget)) this.parentElement.classList.remove('editing')"
+                    oninput="updateStatColor(this, this.value * (this.parentElement.querySelector('.combat-unit-select').value==='M'?1000:1), 1000)"
+                    title="战斗力；旧数据默认 K，可在编辑时切换 K 或 M" /><span class="stat-suffix combat-unit-label">${ch.combatPowerUnit||'K'}</span><select class="stat-suffix combat-unit-select" onchange="changeCombatPowerUnit('${acc.id}','${ch.id}',this.value)" title="编辑战斗力单位" onblur="if (!this.parentElement.contains(event.relatedTarget)) this.parentElement.classList.remove('editing')"><option value="K" ${(ch.combatPowerUnit||'K')==='K'?'selected':''}>K</option><option value="M" ${(ch.combatPowerUnit||'K')==='M'?'selected':''}>M</option></select>
               </div>
             </div>
           </div>
@@ -4374,7 +4407,7 @@ setInterval(updateRecoveryDisplay, 30000);
 <script>
 if (location.hostname === 'test.buyali.xyz') {
   const versionTag = document.getElementById('appVersionTag');
-  if (versionTag) versionTag.textContent = 'V1.3.4.4-test';
+  if (versionTag) versionTag.textContent = 'V1.3.5-test';
 }
 </script>
 </body>

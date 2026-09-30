@@ -4,7 +4,7 @@ const PAIR_TTL = 5 * 60;
 const DEVICE_TTL = 365 * 24 * 3600;
 const TX_TTL = 15 * 60;
 const UNDO_WINDOW_MS = 8000;
-const ALLOWED_FIELDS = new Set(['whiteEnergy', 'blueEnergy', 'kina', 'combatPower', 'itemLevel']);
+const ALLOWED_FIELDS = new Set(['whiteEnergy', 'blueEnergy', 'kina', 'combatPower', 'combatPowerUnit', 'itemLevel']);
 
 export default {
   async fetch(request, env) {
@@ -166,6 +166,7 @@ async function deviceState(env, device) {
       blueEnergy: character.blueEnergy || 0,
       kina: character.kina,
       combatPower: character.combatPower,
+      combatPowerUnit: character.combatPowerUnit || 'K',
       itemLevel: character.itemLevel
     }))
   }));
@@ -274,7 +275,7 @@ async function createCharacter(request, env, device) {
     blueEnergy: 0, blueBackpackLarge: null, blueBackpackSmall: null, awakeningDone: null, abyssDone: null,
     sanctuary1Done: null, sanctuary2Done: null, sanctuary3Done: null, shopDone: null, transformDone: null,
     sanctuary1Name: null, sanctuary2Name: null, sanctuary3Name: null,
-    trialDone: null, trialLv: 0, itemLevel: null, combatPower: null, kina: null
+    trialDone: null, trialLv: 0, itemLevel: null, combatPower: null, combatPowerUnit: 'K', kina: null
   };
   account.characters = account.characters || [];
   account.characters.push(character);
@@ -287,8 +288,16 @@ async function createCharacter(request, env, device) {
 function validateFields(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, error: '没有可写入字段' };
   const result = {};
+  const combatPowerUnit = String(input.combatPowerUnit || 'K').toUpperCase();
+  if (Object.prototype.hasOwnProperty.call(input, 'combatPowerUnit') && !Object.prototype.hasOwnProperty.call(input, 'combatPower')) {
+    return { ok: false, error: '战斗力单位必须与数值一起提交' };
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'combatPowerUnit') && !['K', 'M'].includes(combatPowerUnit)) {
+    return { ok: false, error: 'combatPowerUnit 单位无效' };
+  }
   for (const [key, raw] of Object.entries(input)) {
     if (!ALLOWED_FIELDS.has(key)) continue;
+    if (key === 'combatPowerUnit') { result[key] = combatPowerUnit; continue; }
     const value = Number(raw);
     if (!Number.isFinite(value) || value < 0) return { ok: false, error: key + ' 数值无效' };
     if (key === 'whiteEnergy' && value > 840) return { ok: false, error: '白奥德超出范围' };
@@ -296,8 +305,11 @@ function validateFields(input) {
     if (key === 'combatPower' && value > 999999999) return { ok: false, error: key + ' 超出范围' };
     if (key === 'itemLevel' && value > 9999) return { ok: false, error: key + ' 超出范围' };
     if (key === 'kina' && value > 999999999999) return { ok: false, error: '基纳超出范围' };
-    result[key] = (key === 'combatPower') ? Math.round(value * 10) / 10 : Math.floor(value);
+    result[key] = (key === 'combatPower')
+      ? Math.round(value * (combatPowerUnit === 'M' ? 1000 : 10)) / (combatPowerUnit === 'M' ? 1000 : 10)
+      : Math.floor(value);
   }
+  if (Object.prototype.hasOwnProperty.call(result, 'combatPower')) result.combatPowerUnit = combatPowerUnit;
   return Object.keys(result).length ? { ok: true, value: result } : { ok: false, error: '没有可写入字段' };
 }
 

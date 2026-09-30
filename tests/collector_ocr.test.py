@@ -88,6 +88,28 @@ class CollectorParsingTests(unittest.TestCase):
         ]))
 
     @patch("app.rapid_read")
+    def test_combat_power_millions_keep_m_unit_and_three_decimals(self, rapid_read):
+        rapid_read.side_effect = [[], [("1.023M", 0.99)]]
+        fields, scores = recognize(Image.new("RGB", (1920, 1080), "black"))
+        self.assertEqual(fields["combatPower"], 1.023)
+        self.assertEqual(fields["combatPowerUnit"], "M")
+        self.assertEqual(scores["combatPower"], 99)
+
+    @patch("app.rapid_read")
+    def test_combat_power_thousands_keep_k_unit(self, rapid_read):
+        rapid_read.side_effect = [[], [("1,023K", 0.98)]]
+        fields, _ = recognize(Image.new("RGB", (1920, 1080), "black"))
+        self.assertEqual(fields["combatPower"], 1023)
+        self.assertEqual(fields["combatPowerUnit"], "K")
+
+    @patch("app.rapid_read")
+    def test_combat_power_m_has_priority_over_item_level_grammar(self, rapid_read):
+        rapid_read.side_effect = [[], [("1.023M", 0.99), ("4,531", 0.98)]]
+        fields, _ = recognize(Image.new("RGB", (1920, 1080), "black"))
+        self.assertEqual(fields["combatPowerUnit"], "M")
+        self.assertNotIn("itemLevel", fields)
+
+    @patch("app.rapid_read")
     def test_capture_rechecks_truncated_kina_at_native_scale(self, rapid_read):
         rapid_read.side_effect = [
             [("3,338", 0.99), ("438,589,36", 0.84), ("433,589,356", 0.85)],

@@ -41,6 +41,7 @@ from app import (
     user32,
     window_title,
 )
+from combat_power import combat_power_delta, format_combat_delta, format_combat_power, power_to_k
 from theme import (
     AMBER, BG, BORDER, CLASS_LABELS, CYAN, FONT, GREEN, MUTED, PANEL,
     PANEL_2, PURPLE, PURPLE_HOVER, RED, TEXT,
@@ -153,7 +154,7 @@ def button(parent, text, command, primary=False, danger=False, width=12):
     )
 
 
-def format_change(key, before, after):
+def format_change(key, before, after, before_unit="K", after_unit="K"):
     """Format a display-only signed delta without changing submitted values."""
     if before in (None, ""):
         return "新增", GREEN
@@ -163,13 +164,15 @@ def format_change(key, before, after):
     except (TypeError, ValueError):
         return "已修改", AMBER
     delta = after_number - before_number
+    if key == "combatPower":
+        delta = combat_power_delta(before_number, before_unit, after_number, after_unit)
     if abs(delta) < 0.0001:
         return "0", MUTED
     sign = "+" if delta > 0 else "-"
     color = GREEN if delta > 0 else RED
     magnitude = abs(delta)
     if key == "combatPower":
-        text = f"{magnitude:,.2f}".rstrip("0").rstrip(".") + "K"
+        text = format_combat_delta(magnitude)
     elif float(magnitude).is_integer():
         text = f"{int(magnitude):,}"
     else:
@@ -1325,34 +1328,48 @@ class CollectorApp:
             tk.Label(headings, text=title, bg=PANEL_2, fg=MUTED, font=(FONT, 9, "bold"),
                      anchor="w").grid(row=0, column=column, sticky="ew", padx=(12, 6), pady=9)
         entries = {}
+        # OCR unit is authoritative during collection; edits may change the
+        # number but must retain the source unit.
+        combat_unit = {"value": str(fields.get("combatPowerUnit", "K")).upper()}
         old_values = {}
         change_labels = {}
-        def display_value(value, key=None):
+        def display_value(value, key=None, unit="K"):
             if value is None or value == "": return "—"
             if isinstance(value, (int, float)):
+                if key == "combatPower": return format_combat_power(value, unit)
                 rendered = f"{value:,}"
-                return rendered + "K" if key == "combatPower" else rendered
+                return rendered
             return str(value)
         def parsed_value(key, value):
-            clean = value.replace(",", "").strip().rstrip("Kk")
-            return round(float(clean), 2) if key == "combatPower" else int(clean)
+            if key == "combatPower":
+                clean = value.replace(",", "").strip().rstrip("KkMm")
+                return round(float(clean), 3 if combat_unit["value"] == "M" else 2)
+            clean = value.replace(",", "").strip()
+            return int(clean)
         def update_change_display(key, entry):
             try:
                 after = parsed_value(key, entry.get())
                 before = old_values[key]
                 if before is not None:
                     before = round(float(before), 2) if key == "combatPower" else int(before)
-                changed = before is None or after != before
+                before_unit = str(character.get("combatPowerUnit") or "K").upper()
+                after_unit = combat_unit["value"]
+                if key == "combatPower":
+                    changed = before is None or abs(power_to_k(before, before_unit) - power_to_k(after, after_unit)) >= 0.0001
+                else:
+                    changed = before is None or after != before
             except (TypeError, ValueError):
                 change_labels[key].config(text="格式错误", fg=RED)
                 entry.config(fg=RED)
                 return
-            delta_text, delta_color = format_change(key, before, after)
+            delta_text, delta_color = format_change(key, before, after, before_unit, after_unit)
             change_labels[key].config(text=delta_text, fg=delta_color)
             entry.config(fg=AMBER if changed else TEXT)
         table = tk.Frame(body, bg=BG, highlightbackground=BORDER, highlightthickness=1)
         table.pack(fill="x")
         for index, (key, value) in enumerate(fields.items()):
+            if key == "combatPowerUnit":
+                continue
             row = tk.Frame(table, bg=BG); row.pack(fill="x")
             if index:
                 tk.Frame(row, bg=BORDER, height=1).pack(fill="x")
@@ -1366,10 +1383,18 @@ class CollectorApp:
             old_values[key] = character.get("whiteEnergyDisplay") if key == "whiteEnergy" else character.get(key)
             if old_values[key] is None:
                 old_values[key] = character.get(key)
-            tk.Label(values, text=display_value(old_values[key], key), bg=BG, fg=TEXT, font=(FONT, 10), anchor="w").grid(row=0, column=1, sticky="ew", padx=(12, 6), pady=9)
+            old_unit = str(character.get("combatPowerUnit") or "K").upper() if key == "combatPower" else "K"
+            tk.Label(values, text=display_value(old_values[key], key, old_unit), bg=BG, fg=TEXT, font=(FONT, 10), anchor="w").grid(row=0, column=1, sticky="ew", padx=(12, 6), pady=9)
             entry = tk.Entry(values, bg=BG, fg=TEXT, insertbackground=TEXT, relief="flat", bd=0,
                              highlightthickness=0, font=(FONT, 10, "bold"))
-            entry.insert(0, display_value(value, key)); entry.grid(row=0, column=2, sticky="ew", padx=(12, 6), pady=9); entries[key] = entry
+            entry_text = format_combat_power(value, combat_unit["value"]) if key == "combatPower" else display_value(value, key)
+            entry.insert(0, entry_text); entry.grid(row=0, column=2, sticky="ew", padx=(12, 6), pady=9); entries[key] = entry
+            if key == "combatPower":
+                entry.grid_configure(sticky="e", padx=(12, 2))
+                entry.config(state="readonly", readonlybackground=BG)
+                entry.bind("<FocusIn>", lambda _event, e=entry: e.config(state="normal"))
+                entry.bind("<FocusOut>", lambda _event, e=entry: e.config(state="readonly"))
+                entry.grid_configure(padx=(12, 6))
             delta = tk.Label(values, bg=BG, fg=MUTED, font=(FONT, 9, "bold"), anchor="w")
             delta.grid(row=0, column=3, sticky="ew", padx=(12, 6), pady=9); change_labels[key] = delta
             entry.bind("<KeyRelease>", lambda _event, k=key, e=entry: update_change_display(k, e))
@@ -1389,11 +1414,17 @@ class CollectorApp:
             # editable, but must never pass the automatic-write countdown.
             if key == "itemLevel" and ratio > 0.05:
                 reasonable_change = False
-            elif key == "combatPower" and ratio > 0.30:
-                reasonable_change = False
+            elif key == "combatPower":
+                old_unit = str(character.get("combatPowerUnit") or "K").upper()
+                new_unit = str(fields.get("combatPowerUnit") or "K").upper()
+                before_k = power_to_k(before_number, old_unit)
+                after_k = power_to_k(after_number, new_unit)
+                ratio = abs(after_k - before_k) / max(1.0, abs(before_k))
+                if ratio > 0.30:
+                    reasonable_change = False
             elif key == "kina" and ratio > 0.60:
                 reasonable_change = False
-        reliable = all(scores.get(key, 0) >= 80 for key in fields) and binding_matches and reasonable_change
+        reliable = all(scores.get(key, 0) >= 80 for key in fields if key != "combatPowerUnit") and binding_matches and reasonable_change
         status = tk.Label(body, bg=BG, fg=CYAN, font=(FONT, 9)); status.pack(fill="x", pady=(14, 8))
         controls = tk.Frame(body, bg=BG); controls.pack(fill="x")
         remaining = [5]
@@ -1403,6 +1434,8 @@ class CollectorApp:
         def submit():
             try:
                 edited = {k: parsed_value(k, e.get()) for k, e in entries.items()}
+                if "combatPower" in edited:
+                    edited["combatPowerUnit"] = combat_unit["value"]
             except ValueError:
                 self.notice("数据格式错误", "请输入有效整数。", "error"); return
             payload = {"accountId": account["id"], "characterId": character["id"], "characterName": game.character, "windowTitle": game.title, "fields": edited}
@@ -1460,11 +1493,14 @@ class CollectorApp:
         result_list = tk.Frame(body, bg=BG, highlightbackground=BORDER, highlightthickness=1)
         result_list.pack(fill="x")
         for index, (key, value) in enumerate(fields.items()):
+            if key == "combatPowerUnit":
+                continue
             if index: tk.Frame(result_list, bg=BORDER, height=1).pack(fill="x")
             row = tk.Frame(result_list, bg=BG); row.pack(fill="x", padx=12, pady=7)
             tk.Label(row, text=FIELD_LABELS[key], bg=BG, fg=MUTED,
                      font=(FONT, 9), anchor="w").pack(side="left")
-            tk.Label(row, text=f"{value:,}", bg=BG, fg=TEXT,
+            rendered = format_combat_power(value, fields.get("combatPowerUnit", "K")) if key == "combatPower" else f"{value:,}"
+            tk.Label(row, text=rendered, bg=BG, fg=TEXT,
                      font=(FONT, 9, "bold"), anchor="e").pack(side="right")
         status = tk.Label(body, bg=BG, fg=MUTED, font=(FONT, 9)); status.pack(fill="x", pady=5)
         remaining = [8]

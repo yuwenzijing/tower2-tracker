@@ -2,12 +2,14 @@
 
 Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。网页用于管理账号、角色、奥德、道具等级、战斗力、基纳和待办事项；Windows 数据采集助手可从当前游戏窗口识别数据，并在用户确认后写入已配对的网页数据。
 
-当前正式网页版本：`V1.3.4.4`
+当前正式网页版本：`V1.3.5`
+
+V1.3.5 已完成测试环境验收并正式发布。
 
 - 正式网站：[https://buyali.xyz](https://buyali.xyz)
-- 最新版本：[GitHub Release V1.3.4.1](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.4.1)
-- Windows 采集助手：[下载 BuyaliCollector-v1.3.4.1.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.4.1/BuyaliCollector-v1.3.4.1.zip)
-- 完整更新内容：[V1.3.3 更新日志](V1.3.3更新日志.md)
+- 最新版本：[GitHub Release V1.3.5](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.5)
+- Windows 采集助手：[下载 BuyaliCollector-v1.3.5.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.5/BuyaliCollector-v1.3.5.zip)
+- 更新内容：[V1.3.5 正式发布说明](V1.3.5更新说明.md)、[V1.3.3 更新日志](V1.3.3更新日志.md)
 
 ## 主要功能
 
@@ -23,17 +25,18 @@ Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。
 ### Windows 数据采集助手
 
 - 识别当前游戏角色、白奥德、蓝奥德、基纳、战斗力和道具等级。
+- 战斗力识别并原样保存 `K` / `M` 数值与单位；`M` 支持三位小数，变化值统一按 `K` 计算。
 - 左键浮窗入口开始采集，右键查看角色信息。
-- 写入前显示“变更前 / 变更后 / 变化”，允许人工修正。
+- 写入前显示“变更前 / 变更后 / 变化”，允许修正数值并保留 OCR 识别的战斗力单位。
 - 识别角色与目标角色不一致时阻止自动写入。
 - 支持配对、重新绑定、同账号筛选、写入撤回和自动更新。
 - 原始截图只在本机内存中处理，不上传、不长期保存。
 
 ## 安装采集助手
 
-1. 下载 `BuyaliCollector-v1.3.4.1.zip`。
+1. 下载 `BuyaliCollector-v1.3.5.zip`。
 2. 将压缩包完整解压到任意可写文件夹。
-3. 打开解压后的 `BuyaliCollector-v1.3.4.1` 文件夹。
+3. 打开解压后的 `BuyaliCollector-v1.3.5` 文件夹。
 4. 运行根目录中的 `BuyaliCollector.exe`。
 5. 保留 `_internal` 目录，不能删除、移动或改名。
 
