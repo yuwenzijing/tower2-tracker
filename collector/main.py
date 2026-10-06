@@ -1116,7 +1116,9 @@ class CollectorApp:
         # The visual state changes synchronously; start background work on the
         # next short UI turn instead of imposing a fixed 160 ms delay.
         self.root.after(20, lambda: self.capture_after_hide(game, serial))
-        self.root.after(25000, lambda: self.capture_watchdog(serial))
+        # A state request may use one safe retry (up to ~25 seconds) while OCR
+        # runs in parallel. Keep the watchdog beyond that bounded network time.
+        self.root.after(40000, lambda: self.capture_watchdog(serial))
 
     def capture_after_hide(self, game, serial):
         threading.Thread(target=self.capture_worker, args=(game, serial), daemon=True).start()
@@ -1151,7 +1153,7 @@ class CollectorApp:
             if not fields:
                 raise RuntimeError("未识别到有效数据，请确认已打开奥德或角色数据界面。")
             self.capture_phase = "network"
-            if not state_ready.wait(13):
+            if not state_ready.wait(26):
                 raise RuntimeError("获取最新角色数据超时，请重新采集。")
             if "error" in state_result:
                 raise state_result["error"]

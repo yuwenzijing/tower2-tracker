@@ -97,6 +97,15 @@ class CollectorInteractionTests(unittest.TestCase):
         self.assertIn("self.root.after(20", capture)
         self.assertIn("threading.Thread(target=fetch_latest_state", capture)
         self.assertIn("state_ready.wait", capture)
+        self.assertIn("self.root.after(40000", capture)
+        self.assertIn("state_ready.wait(26)", capture)
+
+    def test_only_read_only_capture_state_get_is_retried(self):
+        request = APP_SOURCE[APP_SOURCE.index("    def request(self, method: str, route: str, payload"):APP_SOURCE.index("    def redeem(self, code: str)")]
+        self.assertIn('retries = 1 if method == "GET" and route == "state" else 0', request)
+        self.assertIn("exc.code in (502, 503, 504) and attempt < retries", request)
+        self.assertIn("except (URLError, TimeoutError, socket.timeout)", request)
+        self.assertIn("已自动重试一次", request)
 
     def test_live_title_skips_character_ocr(self):
         worker = SOURCE[SOURCE.index("    def capture_worker"):SOURCE.index("    def prepare_result")]

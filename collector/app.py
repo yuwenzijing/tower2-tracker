@@ -6,6 +6,7 @@ import difflib
 import json
 import os
 import re
+import socket
 import sys
 import threading
 import time
@@ -27,7 +28,7 @@ except ImportError:  # Parsing-only tests do not need the OCR runtime.
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.5"
+APP_VERSION = "1.3.6"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
@@ -143,25 +144,50 @@ class ApiClient:
                 raise ApiError("采集助手尚未配对，请输入网页显示的 6 位连接码", pairing_required=True)
             headers["Authorization"] = "Bearer " + token
         body = json.dumps(payload).encode() if payload is not None else None
-        req = Request(API_BASE + "/api/capture/" + route, data=body, headers=headers, method=method)
-        try:
-            with urlopen(req, timeout=12) as response:
-                result = json.loads(response.read().decode("utf-8"))
-        except HTTPError as exc:
+        request_url = API_BASE + "/api/capture/" + route
+        # State is a read-only request and happens before the confirmation UI.
+        # Retry it once for transient Wi-Fi/DNS/edge failures; never retry writes,
+        # because their response can time out after the server has committed.
+        retries = 1 if method == "GET" and route == "state" else 0
+        attempt = 0
+        while True:
             try:
-                detail = json.loads(exc.read().decode("utf-8")).get("error", str(exc))
-            except Exception:
-                detail = str(exc)
-            if authenticated and exc.code in (401, 403):
-                self.config.pop("deviceToken", None)
-                self.config["bindings"] = {}
-                self.config["windowCharacters"] = {}
-                self.config["apiBase"] = API_BASE
-                save_config(self.config)
-                raise ApiError("配对已失效，请重新输入网页显示的 6 位连接码", pairing_required=True) from exc
-            raise ApiError(detail) from exc
-        except (URLError, TimeoutError) as exc:
-            raise ApiError("无法连接 Buyali 正式服务") from exc
+                req = Request(request_url, data=body, headers=headers, method=method)
+                with urlopen(req, timeout=12) as response:
+                    result = json.loads(response.read().decode("utf-8"))
+                break
+            except HTTPError as exc:
+                if exc.code in (502, 503, 504) and attempt < retries:
+                    exc.close()
+                    attempt += 1
+                    time.sleep(0.6)
+                    continue
+                try:
+                    detail = json.loads(exc.read().decode("utf-8")).get("error", str(exc))
+                except Exception:
+                    detail = str(exc)
+                if authenticated and exc.code in (401, 403):
+                    self.config.pop("deviceToken", None)
+                    self.config["bindings"] = {}
+                    self.config["windowCharacters"] = {}
+                    self.config["apiBase"] = API_BASE
+                    save_config(self.config)
+                    raise ApiError("配对已失效，请重新输入网页显示的 6 位连接码", pairing_required=True) from exc
+                raise ApiError(detail) from exc
+            except (URLError, TimeoutError, socket.timeout) as exc:
+                if attempt < retries:
+                    attempt += 1
+                    time.sleep(0.6)
+                    continue
+                reason = getattr(exc, "reason", exc)
+                if isinstance(reason, (TimeoutError, socket.timeout)):
+                    if route == "state" and method == "GET":
+                        message = "连接 Buyali 正式服务超时，已自动重试一次；请检查网络后重新采集。"
+                    else:
+                        message = "连接 Buyali 正式服务超时，请检查网络后重试。若发生在写入后，请先核对网页数据。"
+                else:
+                    message = "当前网络无法连接 Buyali 正式服务，请检查网络连接后重试。"
+                raise ApiError(message) from exc
         if not result.get("ok", True):
             raise ApiError(result.get("error", "请求失败"))
         return result
