@@ -100,6 +100,12 @@ class CollectorInteractionTests(unittest.TestCase):
         self.assertIn("self.root.after(40000", capture)
         self.assertIn("state_ready.wait(26)", capture)
 
+    def test_capture_uses_recent_state_cache_during_slow_refresh(self):
+        worker = SOURCE[SOURCE.index("    def capture_worker"):SOURCE.index("    def prepare_result")]
+        self.assertIn('cached_state_age <= 120', worker)
+        self.assertIn('state_ready.wait(0.25)', worker)
+        self.assertIn('state_result.get("data", cached_state)', worker)
+
     def test_only_read_only_capture_state_get_is_retried(self):
         request = APP_SOURCE[APP_SOURCE.index("    def request(self, method: str, route: str, payload"):APP_SOURCE.index("    def redeem(self, code: str)")]
         self.assertIn('retries = 1 if method == "GET" and route == "state" else 0', request)

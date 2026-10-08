@@ -36,7 +36,7 @@
         '<button class="capture-close" type="button" aria-label="关闭">×</button>' +
         '<h3>连接数据采集助手</h3>' +
         '<div class="capture-desc">在 Windows 采集助手中输入下方一次性配对码。配对成功后，助手可以按游戏窗口标题匹配角色并提交识别结果。配对码 5 分钟内有效。</div>' +
-        '<a class="capture-download" id="captureDownload" href="https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.6/BuyaliCollector-v1.3.6.zip" target="_blank" rel="noopener">下载 Windows 数据采集助手 V1.3.6</a>' +
+        '<a class="capture-download" id="captureDownload" href="https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.8/BuyaliCollector-v1.3.8.zip" target="_blank" rel="noopener">下载 Windows 数据采集助手 V1.3.8</a>' +
         '<div class="capture-code" id="capturePairCode">------</div>' +
         '<div class="capture-status" id="capturePairStatus"></div>' +
         '<div class="capture-actions">' +
@@ -81,7 +81,7 @@
       var response = await fetch(API + '/pair', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Sync-Token': token },
-        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.5-test' : 'web-v1.3.6' })
+        body: JSON.stringify({ client: location.hostname === 'test.buyali.xyz' ? 'web-v1.3.8-test' : 'web-v1.3.8' })
       });
       var result = await response.json();
       if (!response.ok) throw new Error(result.error || ('HTTP ' + response.status));
@@ -116,6 +116,7 @@
 
   var pollInFlight = false;
   var pollStopped = false;
+  var pollAbortController = null;
 
   async function pollCaptureEvents() {
     if (pollInFlight || pollStopped) return;
@@ -127,17 +128,20 @@
     pollInFlight = true;
     try {
       var token = await hashPassphrase(passphrase);
+      pollAbortController = typeof AbortController !== 'undefined' ? new AbortController() : null;
       var response = await fetch(API + '/events?after=' + latestEventId(), {
-        headers: { 'X-Sync-Token': token }
+        headers: { 'X-Sync-Token': token },
+        signal: pollAbortController ? pollAbortController.signal : undefined
       });
       if (!response.ok) return;
       var result = await response.json();
       (result.events || []).forEach(applyCaptureEvent);
     } catch (error) {
-      console.warn('capture event poll failed', error);
+      if (!error || error.name !== 'AbortError') console.warn('capture event poll failed', error);
     } finally {
+      pollAbortController = null;
       pollInFlight = false;
-      if (!pollStopped) setTimeout(pollCaptureEvents, 100);
+      if (!pollStopped && !document.hidden) setTimeout(pollCaptureEvents, 250);
     }
   }
 
@@ -185,12 +189,12 @@
 
   injectStyles();
   injectModal();
-  pollCaptureEvents();
   document.addEventListener('visibilitychange', function () {
+    if (document.hidden && pollAbortController) pollAbortController.abort();
     if (!document.hidden) pollCaptureEvents();
   });
   (async function bootstrapCaptureSync() {
-    await pollCaptureEvents();
     if (typeof syncOnLoad === 'function') await syncOnLoad();
+    await pollCaptureEvents();
   })();
 })();

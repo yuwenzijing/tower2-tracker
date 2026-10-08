@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "public" / "index.html"
+SOURCE = ROOT / "public" / "app.js"
 OUTPUT = Path(__file__).resolve().parent / "assets" / "classes"
 
 

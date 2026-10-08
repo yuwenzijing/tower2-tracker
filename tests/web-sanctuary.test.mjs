@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 
-const source = await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const source = (await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8')) +
+  (await fs.readFile(new URL('../public/app.js', import.meta.url), 'utf8'));
 
 assert.match(source, /SANCTUARY_OPTIONS\s*=\s*\['卢德莱', '侵蚀净化所', '穆斯费尔圣杯', '悲叹雪原'\]/,
   '圣域候选池必须包含四个指定项目');

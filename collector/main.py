@@ -1125,6 +1125,8 @@ class CollectorApp:
 
     def capture_worker(self, game, serial):
         started_at = time.perf_counter()
+        cached_state = self.cached_state
+        cached_state_age = time.time() - self.cached_state_at if self.cached_state_at else float("inf")
         state_result = {}
         state_ready = threading.Event()
         def fetch_latest_state():
@@ -1153,10 +1155,19 @@ class CollectorApp:
             if not fields:
                 raise RuntimeError("未识别到有效数据，请确认已打开奥德或角色数据界面。")
             self.capture_phase = "network"
-            if not state_ready.wait(26):
-                raise RuntimeError("获取最新角色数据超时，请重新采集。")
-            if "error" in state_result:
-                raise state_result["error"]
+            # Recent state is sufficient for binding and confirmation. Do not
+            # discard successful local OCR merely because a read-only refresh
+            # is slow; the apply endpoint still validates and updates the live
+            # cloud record atomically.
+            if cached_state and cached_state_age <= 120:
+                state_ready.wait(0.25)
+                data = state_result.get("data", cached_state)
+            else:
+                if not state_ready.wait(26):
+                    raise RuntimeError("获取最新角色数据超时，请重新采集。")
+                if "error" in state_result:
+                    raise state_result["error"]
+                data = state_result["data"]
             network_done = time.perf_counter()
             self.capture_timings = {
                 "dispatchMs": round((screenshot_at - started_at) * 1000, 1),
@@ -1165,7 +1176,7 @@ class CollectorApp:
                 "characterOcrMs": round((character_done - fields_done) * 1000, 1),
                 "totalBeforeUiMs": round((network_done - started_at) * 1000, 1),
             }
-            self.prepare_result(game, fields, scores, hint, serial, state_result["data"])
+            self.prepare_result(game, fields, scores, hint, serial, data)
         except Exception as exc:
             self.root.after(0, lambda exc=exc: self.capture_error(exc, serial))
 

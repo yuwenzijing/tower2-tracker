@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const source = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../public/index.html', import.meta.url), 'utf8') +
+  fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 
 assert.match(source, /if \(ch\.note === undefined\) ch\.note = '';/, '旧数据应补齐备注字段');
 assert.match(source, /note: '',/, '新角色应包含备注字段');

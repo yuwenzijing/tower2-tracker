@@ -11,7 +11,15 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === '/api/sync') return handleSync(request, env);
     if (url.pathname.startsWith('/api/capture/')) return handleCapture(request, env, url);
-    return env.ASSETS.fetch(request);
+    const response = await env.ASSETS.fetch(request);
+    if (!response.ok || request.method !== 'GET') return response;
+    const headers = new Headers(response.headers);
+    if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+      headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=86400');
+    } else if (/\.(?:js|json|webp|png|svg|ico)$/i.test(url.pathname)) {
+      headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    }
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   }
 };
 

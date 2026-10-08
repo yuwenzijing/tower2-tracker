@@ -3,7 +3,8 @@ import fs from 'node:fs/promises';
 
 const source = await fs.readFile(new URL('../src/index.js', import.meta.url), 'utf8');
 const worker = (await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)).default;
-const webSource = await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+const webSource = (await fs.readFile(new URL('../public/index.html', import.meta.url), 'utf8')) +
+  (await fs.readFile(new URL('../public/app.js', import.meta.url), 'utf8'));
 assert.match(webSource, /\.stat-group \.combat-unit-select \{ display: none !important; \}/, 'unit selector is hidden when not editing');
 assert.match(webSource, /\.stat-group\.editing \.combat-unit-select \{ display: inline-block !important; \}/, 'unit selector appears in edit mode');
 assert.match(webSource, /class="stat-suffix combat-unit-label">\$\{ch\.combatPowerUnit\|\|'K'\}<\/span>/, 'idle state renders a plain unit label');

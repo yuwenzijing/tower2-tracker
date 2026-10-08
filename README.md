@@ -2,16 +2,16 @@
 
 Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。网页用于管理账号、角色、奥德、道具等级、战斗力、基纳和待办事项；Windows 数据采集助手可从当前游戏窗口识别数据，并在用户确认后写入已配对的网页数据。
 
-当前正式网页版本：`V1.3.7`
+当前正式网页版本：`V1.3.8`
 
-V1.3.5 于 2026-09-30 正式发布；V1.3.7 于 2026-10-08 更新道具等级上限。
+V1.3.8 于 2026-10-08 发布，集中优化网页加载、云同步和采集助手弱网稳定性。
 
 采集助手超时修复已更新为正式版本 `1.3.6`。
 
 - 正式网站：[https://buyali.xyz](https://buyali.xyz)
-- 最新版本：[GitHub Release V1.3.7](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.7)
-- Windows 采集助手：[下载 BuyaliCollector-v1.3.6.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.6/BuyaliCollector-v1.3.6.zip)
-- 更新内容：[V1.3.7 更新说明](V1.3.7更新说明.md)、[V1.3.5 正式发布说明](V1.3.5更新说明.md)
+- 最新版本：[GitHub Release V1.3.8](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.8)
+- Windows 采集助手：[下载 BuyaliCollector-v1.3.8.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.8/BuyaliCollector-v1.3.8.zip)
+- 更新内容：[V1.3.8 更新说明](V1.3.8更新说明.md)
 
 ## 主要功能
 
@@ -36,9 +36,9 @@ V1.3.5 于 2026-09-30 正式发布；V1.3.7 于 2026-10-08 更新道具等级上
 
 ## 安装采集助手
 
-1. 下载 `BuyaliCollector-v1.3.6.zip`。
+1. 下载 `BuyaliCollector-v1.3.8.zip`。
 2. 将压缩包完整解压到任意可写文件夹。
-3. 打开解压后的 `BuyaliCollector-v1.3.6` 文件夹。
+3. 打开解压后的 `BuyaliCollector-v1.3.8` 文件夹。
 4. 运行根目录中的 `BuyaliCollector.exe`。
 5. 保留 `_internal` 目录，不能删除、移动或改名。
 
