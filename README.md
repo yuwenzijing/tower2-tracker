@@ -2,16 +2,16 @@
 
 Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。网页用于管理账号、角色、奥德、道具等级、战斗力、基纳和待办事项；Windows 数据采集助手可从当前游戏窗口识别数据，并在用户确认后写入已配对的网页数据。
 
-当前正式网页版本：`V1.3.5`
+当前正式网页版本：`V1.3.7`
 
-V1.3.5 已于 2026-09-30 完成测试环境验收并正式发布。
+V1.3.5 于 2026-09-30 正式发布；V1.3.7 于 2026-10-08 更新道具等级上限。
 
 采集助手超时修复已更新为正式版本 `1.3.6`。
 
 - 正式网站：[https://buyali.xyz](https://buyali.xyz)
-- 最新版本：[GitHub Release V1.3.6](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.6)
+- 最新版本：[GitHub Release V1.3.7](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.7)
 - Windows 采集助手：[下载 BuyaliCollector-v1.3.6.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.6/BuyaliCollector-v1.3.6.zip)
-- 更新内容：[V1.3.5 正式发布说明](V1.3.5更新说明.md)、[V1.3.3 更新日志](V1.3.3更新日志.md)
+- 更新内容：[V1.3.7 更新说明](V1.3.7更新说明.md)、[V1.3.5 正式发布说明](V1.3.5更新说明.md)
 
 ## 主要功能
 

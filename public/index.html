@@ -1982,7 +1982,7 @@
 <body>
 
 <header>
-  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.5</span></h1>
+  <h1>永恒之塔2 · 统计 <span class="version-tag" id="appVersionTag">V1.3.7</span></h1>
 </header>
 
 <div class="summary-bar-wrap">
@@ -2957,7 +2957,7 @@ function setItemLevel(accId, charId, val) {
   var r = findChar(accId, charId); if (!r) return;
   pushUndo();
   var n = parseInt(val);
-  r.ch.itemLevel = (isNaN(n) || n <= 0) ? null : Math.min(n, 6500);
+  r.ch.itemLevel = (isNaN(n) || n <= 0) ? null : Math.min(n, 9999);
   saveData(); render();
 }
 function setCombatPower(accId, charId, val, unit) {
@@ -3378,10 +3378,10 @@ function render() {
             <div class="right">
               <div class="stat-group">
                 <input class="stat-input" type="number" value="${ch.itemLevel||''}" placeholder="道具"
-                  style="${ch.itemLevel ? 'color:'+getRatioColor(ch.itemLevel,6500) : ''}"
+                  style="${ch.itemLevel ? 'color:'+getRatioColor(ch.itemLevel,9999) : ''}"
                   onchange="setItemLevel('${acc.id}','${ch.id}',this.value)"
-                  oninput="updateStatColor(this, this.value, 6500)"
-                  title="道具等级 (上限6500)" />
+                  oninput="updateStatColor(this, this.value, 9999)"
+                  title="道具等级 (上限9999)" />
               </div>
               <div class="stat-group">
                 <input class="stat-input" type="number" step="${(ch.combatPowerUnit||'K')==='M'?'0.001':'0.1'}" value="${ch.combatPower||''}" placeholder="战力"
@@ -4407,7 +4407,7 @@ setInterval(updateRecoveryDisplay, 30000);
 <script>
 if (location.hostname === 'test.buyali.xyz') {
   const versionTag = document.getElementById('appVersionTag');
-  if (versionTag) versionTag.textContent = 'V1.3.5-test';
+  if (versionTag) versionTag.textContent = 'V1.3.7-test';
 }
 </script>
 </body>
