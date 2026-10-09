@@ -10,6 +10,7 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === '/api/sync') return handleSync(request, env);
+    if (url.pathname === '/api/stats') return handleStats(request, env);
     if (url.pathname.startsWith('/api/capture/')) return handleCapture(request, env, url);
     const response = await env.ASSETS.fetch(request);
     if (!response.ok || request.method !== 'GET') return response;
@@ -88,6 +89,7 @@ async function handleSync(request, env) {
     }
     if (incoming && typeof incoming === 'object') delete incoming.baseLastModified;
     await env.SYNC_KV.put(token, JSON.stringify(incoming), { expirationTtl: SYNC_TTL });
+    recordSyncStat(env, token).catch(() => {});
     return json({ success: true });
   }
   return json({ error: 'Method not allowed' }, 405);
@@ -376,4 +378,32 @@ function randomHex(bytes) {
   const values = crypto.getRandomValues(new Uint8Array(bytes));
   return Array.from(values, value => value.toString(16).padStart(2, '0')).join('');
 }
+async function recordSyncStat(env, tokenHash) {
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `_stats:${today}`;
+  const raw = await env.SYNC_KV.get(key);
+  const stats = raw ? JSON.parse(raw) : {};
+  const short = tokenHash.slice(0, 8);
+  stats[short] = (stats[short] || 0) + 1;
+  await env.SYNC_KV.put(key, JSON.stringify(stats), { expirationTtl: 90 * 24 * 3600 });
+}
+
+async function handleStats(request, env) {
+  const url = new URL(request.url);
+  const days = Math.min(parseInt(url.searchParams.get('days') || '7', 10), 90);
+  const result = [];
+  const now = new Date();
+  for (let i = 0; i < days; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const raw = await env.SYNC_KV.get(`_stats:${dateStr}`);
+    const stats = raw ? JSON.parse(raw) : {};
+    const users = Object.keys(stats).length;
+    const totalPushes = Object.values(stats).reduce((a, b) => a + b, 0);
+    result.push({ date: dateStr, activeUsers: users, totalPushes, detail: stats });
+  }
+  return json(result);
+}
+
 function json(data, status = 200) { return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS }); }
