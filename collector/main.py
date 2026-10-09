@@ -24,6 +24,7 @@ from app import (
     API_BASE,
     APP_NAME,
     APP_VERSION,
+    LOG_DIR,
     IS_TEST_BUILD,
     FIELD_LABELS,
     ApiClient,
@@ -34,6 +35,7 @@ from app import (
     configure_ocr,
     find_active_game,
     load_config,
+    log_event,
     match_character_hint,
     recognize,
     recognize_character_text,
@@ -202,8 +204,9 @@ class CollectorApp:
         self.info_settings_panel = None
         self.info_images = []
         self.class_icon_cache = {}
-        self.cached_state = None
-        self.cached_state_at = 0.0
+        saved_state = self.config.get("cachedState")
+        self.cached_state = saved_state if isinstance(saved_state, dict) and isinstance(saved_state.get("accounts"), list) else None
+        self.cached_state_at = float(self.config.get("cachedStateAt") or 0.0) if self.cached_state else 0.0
         self.info_panel_loading = False
         self.info_request_in_flight = False
         self.info_refresh_job = None
@@ -351,6 +354,7 @@ class CollectorApp:
         button(actions, "重新绑定", self.rebind, width=16).grid(row=1, column=0, sticky="ew", padx=4, pady=4)
         self.cancel_button = button(actions, "取消当前采集", self.cancel_capture, danger=True, width=16)
         self.cancel_button.grid(row=1, column=1, sticky="ew", padx=4, pady=4)
+        button(actions, "打开诊断日志", self.open_log_folder, width=16).grid(row=2, column=0, columnspan=2, sticky="ew", padx=4, pady=4)
         self.same_account_var = tk.BooleanVar(value=bool(self.config.get("sameAccountOnly")))
         self.info_auto_refresh_var = tk.BooleanVar(value=bool(self.config.get("infoAutoRefresh", True)))
         tk.Label(self.root, text="关闭主窗口仅最小化到系统托盘", bg=BG, fg=MUTED,
@@ -374,11 +378,30 @@ class CollectorApp:
             pystray.MenuItem("取消当前采集", call(self.cancel_capture)),
             pystray.MenuItem("重置浮窗", call(self.reset_overlay_position)),
             pystray.MenuItem("重新绑定", call(self.rebind)),
+            pystray.MenuItem("打开诊断日志", call(self.open_log_folder)),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("退出", call(self.quit)),
         )
         self.tray = pystray.Icon("BuyaliCollector", image, "Buyali 数据采集助手", menu)
         self.tray.run_detached()
+
+    def open_log_folder(self):
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        os.startfile(str(LOG_DIR))
+
+    def cache_state(self, data):
+        if not self.valid_role_state(data):
+            return False
+        previous = self.cached_state
+        persisted_at = float(self.config.get("cachedStateAt") or 0.0)
+        self.cached_state, self.cached_state_at = data, time.time()
+        # The role panel polls every two seconds. Persist only on change (or a
+        # periodic checkpoint) to avoid turning that into continuous disk I/O.
+        if data != previous or self.cached_state_at - persisted_at >= 60:
+            self.config["cachedState"] = data
+            self.config["cachedStateAt"] = self.cached_state_at
+            save_config(self.config)
+        return True
 
     def save_settings(self):
         self.config["sameAccountOnly"] = bool(self.same_account_var.get())
@@ -518,7 +541,7 @@ class CollectorApp:
             self.finish_info_error(ValueError("服务器返回的角色数据格式无效"))
             return
         changed = data != self.cached_state
-        self.cached_state, self.cached_state_at = data, time.time()
+        self.cache_state(data)
         if self.info_panel and self.info_panel.winfo_exists() and (self.info_panel_loading or changed):
             self.show_info_panel(data)
         self.schedule_info_refresh()
@@ -1067,15 +1090,17 @@ class CollectorApp:
         """Validate persisted credentials before presenting the app as paired."""
         def worker():
             try:
-                self.api.state()
+                data = self.api.state()
             except ApiError as exc:
                 self.root.after(0, lambda: self.pairing_invalid(exc))
             else:
-                self.root.after(0, self.pairing_valid)
+                self.root.after(0, lambda: self.pairing_valid(data))
         threading.Thread(target=worker, daemon=True).start()
 
-    def pairing_valid(self):
+    def pairing_valid(self, data=None):
         self.pair_verified = True
+        if data:
+            self.cache_state(data)
 
     def pairing_invalid(self, exc):
         self.pair_verified = False
@@ -1159,9 +1184,11 @@ class CollectorApp:
             # discard successful local OCR merely because a read-only refresh
             # is slow; the apply endpoint still validates and updates the live
             # cloud record atomically.
-            if cached_state and cached_state_age <= 120:
+            if cached_state:
                 state_ready.wait(0.25)
                 data = state_result.get("data", cached_state)
+                log_event("capture_state", serial=serial, source="network" if "data" in state_result else "cache",
+                          cacheAgeSeconds=round(cached_state_age))
             else:
                 if not state_ready.wait(26):
                     raise RuntimeError("获取最新角色数据超时，请重新采集。")
@@ -1176,14 +1203,16 @@ class CollectorApp:
                 "characterOcrMs": round((character_done - fields_done) * 1000, 1),
                 "totalBeforeUiMs": round((network_done - started_at) * 1000, 1),
             }
+            log_event("capture_ocr_complete", serial=serial, **self.capture_timings)
             self.prepare_result(game, fields, scores, hint, serial, data)
         except Exception as exc:
+            log_event("capture_failed", serial=serial, phase=self.capture_phase, errorType=type(exc).__name__, message=str(exc))
             self.root.after(0, lambda exc=exc: self.capture_error(exc, serial))
 
     def prepare_result(self, game, fields, scores, hint, serial, data):
         try:
             if serial != self.capture_serial: return
-            self.cached_state, self.cached_state_at = data, time.time()
+            self.cache_state(data)
             # A visible green role name is fresh evidence. If it maps to one web
             # role, continue directly to data confirmation. If it is a new role,
             # trust the recognized name and open the create/bind screen without
@@ -1489,9 +1518,11 @@ class CollectorApp:
     def apply_result(self, payload, fields, character, serial):
         try:
             result = self.api.apply(payload)
+            log_event("capture_apply_complete", serial=serial, requestResult="committed")
             if serial != self.capture_serial: return
             self.root.after(0, lambda: self.success_dialog(result["transactionId"], fields, character, serial))
         except Exception as exc:
+            log_event("capture_apply_failed", serial=serial, errorType=type(exc).__name__, message=str(exc))
             self.root.after(0, lambda exc=exc: self.capture_error(exc, serial))
 
     def success_dialog(self, transaction_id, fields, character, serial):

@@ -52,7 +52,7 @@ class CollectorInteractionTests(unittest.TestCase):
         finish = SOURCE[SOURCE.index("    def finish_info_load"):SOURCE.index("    def finish_info_error")]
         self.assertIn("changed = data != self.cached_state", finish)
         self.assertIn("if not self.valid_role_state(data):", finish)
-        self.assertLess(finish.index("valid_role_state"), finish.index("self.cached_state, self.cached_state_at"))
+        self.assertLess(finish.index("valid_role_state"), finish.index("self.cache_state(data)"))
 
     def test_role_panel_uses_confirmed_web_fields_without_transient_header_status(self):
         panel = SOURCE[SOURCE.index("    def show_info_panel"):SOURCE.index("    def close_info_panel")]
@@ -102,9 +102,20 @@ class CollectorInteractionTests(unittest.TestCase):
 
     def test_capture_uses_recent_state_cache_during_slow_refresh(self):
         worker = SOURCE[SOURCE.index("    def capture_worker"):SOURCE.index("    def prepare_result")]
-        self.assertIn('cached_state_age <= 120', worker)
+        self.assertIn('if cached_state:', worker)
         self.assertIn('state_ready.wait(0.25)', worker)
         self.assertIn('state_result.get("data", cached_state)', worker)
+
+    def test_state_cache_survives_restart_and_diagnostics_are_accessible(self):
+        self.assertIn('self.config.get("cachedState")', SOURCE)
+        self.assertIn('self.config["cachedState"] = data', SOURCE)
+        self.assertIn('"打开诊断日志"', SOURCE)
+        self.assertIn('RotatingFileHandler', APP_SOURCE)
+
+    def test_apply_timeout_is_reconciled_by_request_id(self):
+        self.assertIn('payload.setdefault("requestId", str(uuid.uuid4()))', APP_SOURCE)
+        self.assertIn('"request-status?requestId="', APP_SOURCE)
+        self.assertIn("route === 'request-status'", WORKER_SOURCE)
 
     def test_only_read_only_capture_state_get_is_retried(self):
         request = APP_SOURCE[APP_SOURCE.index("    def request(self, method: str, route: str, payload"):APP_SOURCE.index("    def redeem(self, code: str)")]

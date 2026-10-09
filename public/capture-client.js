@@ -36,7 +36,7 @@
         '<button class="capture-close" type="button" aria-label="关闭">×</button>' +
         '<h3>连接数据采集助手</h3>' +
         '<div class="capture-desc">在 Windows 采集助手中输入下方一次性配对码。配对成功后，助手可以按游戏窗口标题匹配角色并提交识别结果。配对码 5 分钟内有效。</div>' +
-        '<a class="capture-download" id="captureDownload" href="https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.8/BuyaliCollector-v1.3.8.zip" target="_blank" rel="noopener">下载 Windows 数据采集助手 V1.3.8</a>' +
+        '<a class="capture-download" id="captureDownload" href="https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.8.1/BuyaliCollector-v1.3.8.1.zip" target="_blank" rel="noopener">下载 Windows 数据采集助手 V1.3.8.1</a>' +
         '<div class="capture-code" id="capturePairCode">------</div>' +
         '<div class="capture-status" id="capturePairStatus"></div>' +
         '<div class="capture-actions">' +

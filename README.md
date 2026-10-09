@@ -6,12 +6,12 @@ Buyali 是面向 AION2 玩家使用的角色数据与每周待办管理工具。
 
 V1.3.8 于 2026-10-08 发布，集中优化网页加载、云同步和采集助手弱网稳定性。
 
-采集助手超时修复已更新为正式版本 `1.3.6`。
+采集助手弱网与诊断修复已更新为正式版本 `1.3.8.1`。
 
 - 正式网站：[https://buyali.xyz](https://buyali.xyz)
-- 最新版本：[GitHub Release V1.3.8](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.8)
-- Windows 采集助手：[下载 BuyaliCollector-v1.3.8.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.8/BuyaliCollector-v1.3.8.zip)
-- 更新内容：[V1.3.8 更新说明](V1.3.8更新说明.md)
+- 最新采集助手：[GitHub Release V1.3.8.1](https://github.com/yuwenzijing/tower2-tracker/releases/tag/v1.3.8.1)
+- Windows 采集助手：[下载 BuyaliCollector-v1.3.8.1.zip](https://github.com/yuwenzijing/tower2-tracker/releases/download/v1.3.8.1/BuyaliCollector-v1.3.8.1.zip)
+- 更新内容：[V1.3.8.1 更新说明](V1.3.8.1更新说明.md)
 
 ## 主要功能
 
@@ -36,9 +36,9 @@ V1.3.8 于 2026-10-08 发布，集中优化网页加载、云同步和采集助�
 
 ## 安装采集助手
 
-1. 下载 `BuyaliCollector-v1.3.8.zip`。
+1. 下载 `BuyaliCollector-v1.3.8.1.zip`。
 2. 将压缩包完整解压到任意可写文件夹。
-3. 打开解压后的 `BuyaliCollector-v1.3.8` 文件夹。
+3. 打开解压后的 `BuyaliCollector-v1.3.8.1` 文件夹。
 4. 运行根目录中的 `BuyaliCollector.exe`。
 5. 保留 `_internal` 目录，不能删除、移动或改名。
 

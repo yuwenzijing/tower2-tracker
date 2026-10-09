@@ -9,9 +9,16 @@ const ALLOWED_FIELDS = new Set(['whiteEnergy', 'blueEnergy', 'kina', 'combatPowe
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname === '/api/sync') return handleSync(request, env);
-    if (url.pathname === '/api/stats') return handleStats(request, env);
-    if (url.pathname.startsWith('/api/capture/')) return handleCapture(request, env, url);
+    const requestId = validRequestId(request.headers.get('X-Request-ID')) || crypto.randomUUID();
+    let apiResponse = null;
+    if (url.pathname === '/api/sync') apiResponse = await handleSync(request, env);
+    if (url.pathname === '/api/stats') apiResponse = await handleStats(request, env);
+    if (url.pathname.startsWith('/api/capture/')) apiResponse = await handleCapture(request, env, url);
+    if (apiResponse) {
+      const headers = new Headers(apiResponse.headers);
+      headers.set('X-Request-ID', requestId);
+      return new Response(apiResponse.body, { status: apiResponse.status, statusText: apiResponse.statusText, headers });
+    }
     const response = await env.ASSETS.fetch(request);
     if (!response.ok || request.method !== 'GET') return response;
     const headers = new Headers(response.headers);
@@ -104,6 +111,7 @@ async function handleCapture(request, env, url) {
   const device = await authenticateDevice(request, env);
   if (!device) return json({ error: 'Invalid device token' }, 401);
   if (route === 'state' && request.method === 'GET') return deviceState(env, device);
+  if (route === 'request-status' && request.method === 'GET') return captureRequestStatus(env, device, url);
   if (route === 'apply' && request.method === 'POST') return applyCapture(request, env, device);
   if (route === 'undo' && request.method === 'POST') return undoCapture(request, env, device);
   if (route === 'create-character' && request.method === 'POST') return createCharacter(request, env, device);
@@ -200,6 +208,12 @@ function effectiveWhiteEnergy(account, character) {
 async function applyCapture(request, env, device) {
   const body = await request.json().catch(() => null);
   if (!body) return json({ error: 'Invalid JSON' }, 400);
+  // Keep pre-1.3.8 clients compatible; newer clients supply a stable ID so a
+  // lost response can be reconciled without applying the capture twice.
+  const requestId = validRequestId(body.requestId) || crypto.randomUUID();
+  const requestKey = 'capture:req:' + requestId;
+  const previous = await env.SYNC_KV.get(requestKey, 'json');
+  if (previous && previous.syncToken === device.syncToken) return json(previous.result);
   const fields = validateFields(body.fields);
   if (!fields.ok) return json({ error: fields.error }, 400);
   const cloud = await readCloud(env, device.syncToken);
@@ -235,14 +249,26 @@ async function applyCapture(request, env, device) {
     createdAt: Date.now(),
     status: 'applied'
   };
+  const result = { success: true, transactionId, characterName: target.character.name, undoUntil: transaction.createdAt + UNDO_WINDOW_MS };
+  // Persist cloud data before marking the request committed. This ordering
+  // prevents a partial KV failure from being reported as a successful write.
+  await writeCloud(env, device.syncToken, cloud);
   await Promise.all([
-    writeCloud(env, device.syncToken, cloud),
-    env.SYNC_KV.put('capture:tx:' + transactionId, JSON.stringify(transaction), { expirationTtl: TX_TTL })
+    env.SYNC_KV.put('capture:tx:' + transactionId, JSON.stringify(transaction), { expirationTtl: TX_TTL }),
+    env.SYNC_KV.put(requestKey, JSON.stringify({ syncToken: device.syncToken, result }), { expirationTtl: TX_TTL })
   ]);
   await appendEvent(env, device.syncToken, {
     type: 'applied', transactionId, characterName: target.character.name, data: cloud.data
   });
-  return json({ success: true, transactionId, characterName: target.character.name, undoUntil: transaction.createdAt + UNDO_WINDOW_MS });
+  return json(result);
+}
+
+async function captureRequestStatus(env, device, url) {
+  const requestId = validRequestId(url.searchParams.get('requestId'));
+  if (!requestId) return json({ error: '请求编号无效' }, 400);
+  const record = await env.SYNC_KV.get('capture:req:' + requestId, 'json');
+  if (!record || record.syncToken !== device.syncToken) return json({ committed: false });
+  return json({ committed: true, result: record.result });
 }
 
 async function undoCapture(request, env, device) {
@@ -406,4 +432,8 @@ async function handleStats(request, env) {
   return json(result);
 }
 
+function validRequestId(value) {
+  const text = String(value || '');
+  return /^[A-Za-z0-9-]{8,80}$/.test(text) ? text : null;
+}
 function json(data, status = 200) { return new Response(JSON.stringify(data), { status, headers: JSON_HEADERS }); }

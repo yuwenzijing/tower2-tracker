@@ -63,12 +63,26 @@ fallbackResponse = await worker.fetch(new Request('https://example.test/api/capt
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code })
 }), fallbackEnv);
 const { deviceToken } = await fallbackResponse.json();
+const stableRequestId = 'capture-request-12345678';
 fallbackResponse = await worker.fetch(new Request('https://example.test/api/capture/apply', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + deviceToken },
-  body: JSON.stringify({ accountId, characterId, fields: { kina: 2 } })
+  body: JSON.stringify({ requestId: stableRequestId, accountId, characterId, fields: { kina: 2 } })
 }), fallbackEnv);
 assert.equal(fallbackResponse.status, 200, '通知 Durable Object 出错时采集写入仍必须成功');
+const firstApply = await fallbackResponse.json();
+fallbackResponse = await worker.fetch(new Request('https://example.test/api/capture/apply', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + deviceToken },
+  body: JSON.stringify({ requestId: stableRequestId, accountId, characterId, fields: { kina: 999 } })
+}), fallbackEnv);
+assert.equal((await fallbackResponse.json()).transactionId, firstApply.transactionId, '相同请求编号不得重复写入');
+fallbackResponse = await worker.fetch(new Request('https://example.test/api/capture/request-status?requestId=' + stableRequestId, {
+  headers: { Authorization: 'Bearer ' + deviceToken }
+}), fallbackEnv);
+const requestStatus = await fallbackResponse.json();
+assert.equal(requestStatus.committed, true, '超时后应能按请求编号确认已提交');
+assert.equal(requestStatus.result.transactionId, firstApply.transactionId);
 fallbackResponse = await worker.fetch(new Request('https://example.test/api/capture/events?after=0', {
   headers: { 'X-Sync-Token': token }
 }), fallbackEnv);

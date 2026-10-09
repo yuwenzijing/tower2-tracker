@@ -1808,24 +1808,69 @@ function saveKinaAndClose() {
 const SYNC_API = '/api/sync';
 const SYNC_PASSPHRASE_KEY = 'aion2_sync_passphrase';
 const SYNC_BASE_REVISION_KEY = 'aion2_sync_base_revision';
+const SYNC_DIAGNOSTIC_KEY = 'aion2_sync_diagnostic_v1';
 let syncDebounceTimer = null;
 let _syncCloudCache = null;
 let _syncOnLoadPromise = null;
 const SYNC_REQUEST_TIMEOUT_MS = 12000;
 
-async function syncFetch(url, options) {
-  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  var timer = controller ? setTimeout(function() { controller.abort(); }, SYNC_REQUEST_TIMEOUT_MS) : null;
+function syncDiagnostic(event, details) {
   try {
-    var requestOptions = Object.assign({}, options || {});
-    if (controller) requestOptions.signal = controller.signal;
-    return await fetch(url, requestOptions);
-  } catch (error) {
-    if (error && error.name === 'AbortError') throw new Error('同步请求超时，请检查网络后重试');
-    throw error;
-  } finally {
-    if (timer) clearTimeout(timer);
+    var logs = JSON.parse(localStorage.getItem(SYNC_DIAGNOSTIC_KEY) || '[]');
+    logs.push(Object.assign({ time: new Date().toISOString(), event: event }, details || {}));
+    localStorage.setItem(SYNC_DIAGNOSTIC_KEY, JSON.stringify(logs.slice(-120)));
+  } catch (_) {}
+}
+
+function newSyncRequestId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+}
+
+async function syncFetch(url, options) {
+  var method = String((options && options.method) || 'GET').toUpperCase();
+  var maxAttempts = method === 'GET' ? 2 : 1;
+  var requestId = newSyncRequestId();
+  for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+    var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = controller ? setTimeout(function() { controller.abort(); }, SYNC_REQUEST_TIMEOUT_MS) : null;
+    var started = Date.now();
+    try {
+      var requestOptions = Object.assign({}, options || {});
+      requestOptions.headers = Object.assign({}, requestOptions.headers || {}, { 'X-Request-ID': requestId });
+      if (controller) requestOptions.signal = controller.signal;
+      var response = await fetch(url, requestOptions);
+      syncDiagnostic('request', { requestId: response.headers.get('X-Request-ID') || requestId,
+        method: method, attempt: attempt, durationMs: Date.now() - started, status: response.status, online: navigator.onLine });
+      if (attempt < maxAttempts && (response.status === 502 || response.status === 503 || response.status === 504)) continue;
+      return response;
+    } catch (error) {
+      var timedOut = error && error.name === 'AbortError';
+      syncDiagnostic('request_error', { requestId: requestId, method: method, attempt: attempt,
+        durationMs: Date.now() - started, errorType: timedOut ? 'timeout' : (error && error.name) || 'network', online: navigator.onLine });
+      if (attempt < maxAttempts) {
+        await new Promise(function(resolve) { setTimeout(resolve, 500); });
+        continue;
+      }
+      if (timedOut) throw new Error('同步请求超时，请检查网络后重试');
+      throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
+}
+
+function downloadSyncDiagnostics() {
+  var logs = [];
+  try { logs = JSON.parse(localStorage.getItem(SYNC_DIAGNOSTIC_KEY) || '[]'); } catch (_) {}
+  var report = { generatedAt: new Date().toISOString(), version: '1.3.8', page: location.origin,
+    online: navigator.onLine, userAgent: navigator.userAgent, logs: logs };
+  var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = 'buyali-sync-diagnostics-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+  link.click();
+  setTimeout(function() { URL.revokeObjectURL(link.href); }, 1000);
 }
 
 function getSyncBaseRevision() {
@@ -1910,6 +1955,7 @@ function openSyncModal() {
         '<button class="sync-btn" onclick="clearSyncPassphrase()">清除口令</button>' +
         '<button class="sync-btn" onclick="manualSyncPush()">手动推送</button>' +
         '<button class="sync-btn" onclick="manualSyncPull()">手动拉取</button>' +
+        '<button class="sync-btn" onclick="downloadSyncDiagnostics()">导出诊断日志</button>' +
       '</div>';
   } else {
     content.innerHTML = closeBtn +
@@ -2005,6 +2051,19 @@ async function syncPush(force) {
     return res.ok;
   } catch(e) {
     console.error('Sync push error:', e);
+    // PUT may have reached the edge even if its response was lost. A read-back
+    // turns that ambiguous timeout into success when the exact revision exists.
+    try {
+      var verified = await syncPull();
+      if (verified && verified.lastModified === payloadData.lastModified) {
+        setSyncBaseRevision(payloadData.lastModified);
+        updateSyncStatus('synced');
+        syncDiagnostic('push_reconciled', { lastModified: payloadData.lastModified });
+        return true;
+      }
+    } catch (verifyError) {
+      syncDiagnostic('push_reconcile_failed', { errorType: (verifyError && verifyError.name) || 'network' });
+    }
     updateSyncStatus('error');
     showToast('推送出错: ' + (e.message || e));
     return false;

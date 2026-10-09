@@ -4,6 +4,8 @@ import ctypes
 import ctypes.wintypes
 import difflib
 import json
+import logging
+from logging.handlers import RotatingFileHandler
 import os
 import re
 import socket
@@ -11,12 +13,13 @@ import sys
 import threading
 import time
 import tkinter as tk
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from collections import Counter
 from tkinter import messagebox, simpledialog, ttk
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, getproxies, urlopen
 
 import numpy as np
 from PIL import Image, ImageEnhance, ImageGrab
@@ -28,14 +31,49 @@ except ImportError:  # Parsing-only tests do not need the OCR runtime.
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.8"
+APP_VERSION = "1.3.8.1"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
 CONFIG_DIR_NAME = "BuyaliCollector-test" if IS_TEST_BUILD else "BuyaliCollector"
 CONFIG_DIR = Path(os.environ.get("APPDATA", Path.home())) / CONFIG_DIR_NAME
 CONFIG_FILE = CONFIG_DIR / "config.json"
+LOG_DIR = CONFIG_DIR / "logs"
+LOG_FILE = LOG_DIR / "collector.log"
 FIELD_LABELS = {"whiteEnergy": "白奥德", "blueEnergy": "蓝奥德", "combatPower": "战斗力", "itemLevel": "道具等级", "kina": "基纳"}
+
+
+def _make_logger():
+    logger = logging.getLogger("buyali.collector")
+    if not logger.handlers:
+        try:
+            LOG_DIR.mkdir(parents=True, exist_ok=True)
+            handler = RotatingFileHandler(LOG_FILE, maxBytes=1024 * 1024, backupCount=4, encoding="utf-8")
+        except OSError:
+            # Read-only/locked profiles must not prevent the collector from
+            # starting. Normal packaged runs write to the per-user AppData dir.
+            handler = logging.NullHandler()
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+    return logger
+
+
+LOGGER = _make_logger()
+
+
+def diagnostic_network_summary():
+    proxies = getproxies()
+    return {
+        "proxySchemes": sorted(key for key in proxies if key in ("http", "https")),
+        "proxyConfigured": bool(proxies),
+    }
+
+
+def log_event(event, **details):
+    safe = {key: value for key, value in details.items() if key not in ("token", "payload", "passphrase")}
+    LOGGER.info("%s", json.dumps({"event": event, **safe}, ensure_ascii=False, default=str))
 
 user32 = ctypes.windll.user32
 try:
@@ -123,9 +161,11 @@ def save_config(config: dict) -> None:
 
 
 class ApiError(RuntimeError):
-    def __init__(self, message: str, pairing_required: bool = False):
+    def __init__(self, message: str, pairing_required: bool = False, uncertain=False, request_id=None):
         super().__init__(message)
         self.pairing_required = pairing_required
+        self.uncertain = uncertain
+        self.request_id = request_id
 
 
 class ApiClient:
@@ -133,10 +173,12 @@ class ApiClient:
         self.config = config
 
     def request(self, method: str, route: str, payload=None, authenticated=True):
+        request_id = str((payload or {}).get("requestId") or uuid.uuid4())
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "User-Agent": f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) BuyaliCollector/{APP_VERSION}",
+            "X-Request-ID": request_id,
         }
         if authenticated:
             token = self.config.get("deviceToken")
@@ -151,12 +193,20 @@ class ApiClient:
         retries = 1 if method == "GET" and route == "state" else 0
         attempt = 0
         while True:
+            started_at = time.perf_counter()
             try:
                 req = Request(request_url, data=body, headers=headers, method=method)
                 with urlopen(req, timeout=12) as response:
                     result = json.loads(response.read().decode("utf-8"))
+                    response_request_id = response.headers.get("X-Request-ID", request_id)
+                log_event("api_request", method=method, route=route, attempt=attempt + 1,
+                          durationMs=round((time.perf_counter() - started_at) * 1000),
+                          status="ok", requestId=response_request_id)
                 break
             except HTTPError as exc:
+                log_event("api_request", method=method, route=route, attempt=attempt + 1,
+                          durationMs=round((time.perf_counter() - started_at) * 1000),
+                          status=exc.code, requestId=exc.headers.get("X-Request-ID", request_id))
                 if exc.code in (502, 503, 504) and attempt < retries:
                     exc.close()
                     attempt += 1
@@ -175,11 +225,15 @@ class ApiClient:
                     raise ApiError("配对已失效，请重新输入网页显示的 6 位连接码", pairing_required=True) from exc
                 raise ApiError(detail) from exc
             except (URLError, TimeoutError, socket.timeout) as exc:
+                reason = getattr(exc, "reason", exc)
+                log_event("api_request", method=method, route=route, attempt=attempt + 1,
+                          durationMs=round((time.perf_counter() - started_at) * 1000),
+                          status="network_error", errorType=type(reason).__name__, requestId=request_id,
+                          network=diagnostic_network_summary())
                 if attempt < retries:
                     attempt += 1
                     time.sleep(0.6)
                     continue
-                reason = getattr(exc, "reason", exc)
                 if isinstance(reason, (TimeoutError, socket.timeout)):
                     if route == "state" and method == "GET":
                         message = "连接 Buyali 正式服务超时，已自动重试一次；请检查网络后重新采集。"
@@ -187,7 +241,7 @@ class ApiClient:
                         message = "连接 Buyali 正式服务超时，请检查网络后重试。若发生在写入后，请先核对网页数据。"
                 else:
                     message = "当前网络无法连接 Buyali 正式服务，请检查网络连接后重试。"
-                raise ApiError(message) from exc
+                raise ApiError(message, uncertain=(method != "GET"), request_id=request_id) from exc
         if not result.get("ok", True):
             raise ApiError(result.get("error", "请求失败"))
         return result
@@ -203,7 +257,23 @@ class ApiClient:
         return self.request("GET", "state")
 
     def apply(self, payload):
-        return self.request("POST", "apply", payload)
+        payload = dict(payload)
+        payload.setdefault("requestId", str(uuid.uuid4()))
+        try:
+            return self.request("POST", "apply", payload)
+        except ApiError as exc:
+            if not exc.uncertain:
+                raise
+            # A lost response does not mean a lost write. Query the idempotency
+            # record before presenting the operation as failed.
+            try:
+                status = self.request("GET", "request-status?requestId=" + payload["requestId"])
+                if status.get("committed") and status.get("result"):
+                    log_event("apply_reconciled", requestId=payload["requestId"])
+                    return status["result"]
+            except ApiError as status_error:
+                log_event("apply_reconcile_failed", requestId=payload["requestId"], errorType=type(status_error).__name__)
+            raise exc
 
     def undo(self, transaction_id):
         return self.request("POST", "undo", {"transactionId": transaction_id})
