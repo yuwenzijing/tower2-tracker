@@ -2128,7 +2128,13 @@ async function syncOnLoad() {
 
 async function _syncOnLoad() {
   var passphrase = getSyncPassphrase();
-  if (!passphrase || location.protocol === 'file:') { updateSyncStatus('off'); return; }
+  if (!passphrase || location.protocol === 'file:') {
+    updateSyncStatus('off');
+    if (!passphrase && location.protocol !== 'file:' && (!DATA.accounts || DATA.accounts.length === 0)) {
+      showToast('尚未设置同步口令，请点击“同步”恢复云端数据');
+    }
+    return;
+  }
   updateSyncStatus('syncing');
   try {
     var cloud = await syncPull();
@@ -2143,6 +2149,15 @@ async function _syncOnLoad() {
     }
     var localMod = DATA._lastModified;
     var cloudMod = cloud.lastModified;
+    // An empty browser has nothing that can be overwritten. Restore the cloud
+    // snapshot immediately instead of opening a conflict dialog or leaving an
+    // empty dashboard while waiting for user input.
+    if ((!DATA.accounts || DATA.accounts.length === 0) && cloud.data && cloud.data.accounts && cloud.data.accounts.length > 0) {
+      applyCloudSyncData(cloud.data, cloudMod);
+      showToast('已从云端恢复数据');
+      syncDiagnostic('empty_local_restored', { cloudLastModified: cloudMod });
+      return;
+    }
     if (localMod && localMod === cloudMod) {
       setSyncBaseRevision(cloudMod);
       updateSyncStatus('synced');
@@ -2354,6 +2369,9 @@ function stopActivityScroll() {
 // ====== Init ======
 loadData();
 render();
+// Cloud restore belongs to the main application startup path. Do not depend
+// on capture-client.js loading successfully before the dashboard can sync.
+setTimeout(function() { syncOnLoad(); }, 0);
 checkMembershipAlert();
 loadActivities();
 setInterval(function() { renderTodayActivities(); }, 60000);
