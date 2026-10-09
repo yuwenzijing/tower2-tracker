@@ -23,7 +23,9 @@ export default {
     if (!response.ok || request.method !== 'GET') return response;
     const headers = new Headers(response.headers);
     if (url.pathname === '/' || url.pathname.endsWith('.html')) {
-      headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=86400');
+      // HTML selects content-hashed/query-versioned assets. Never serve a
+      // stale shell after deployment or users can remain on broken JS.
+      headers.set('Cache-Control', 'no-store');
     } else if (/\.(?:js|json|webp|png|svg|ico)$/i.test(url.pathname)) {
       headers.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     }
