@@ -13,7 +13,7 @@ assert.match(app, /setTimeout\(function\(\) \{ syncOnLoad\(\); \}, 0\)/,
   '主应用应独立启动云同步');
 assert.match(app, /尚未设置同步口令，请点击“同步”恢复云端数据/,
   '空浏览器没有口令时应提供明确指引');
-assert.match(html, /app\.js\?v=1\.3\.8\.2/,
+assert.match(html, /app\.js\?v=1\.3\.8\.3/,
   '修复后应提升资源查询版本，绕过旧浏览器缓存');
 assert.match(worker, /url\.pathname\.endsWith\('\.html'\)[\s\S]*?Cache-Control', 'no-store'/,
   'Worker 不应缓存 HTML 外壳');

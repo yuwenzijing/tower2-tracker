@@ -31,7 +31,7 @@ except ImportError:  # Parsing-only tests do not need the OCR runtime.
 
 
 APP_NAME = "Buyali 数据采集助手"
-APP_VERSION = "1.3.8.1"
+APP_VERSION = "1.3.8.2"
 IS_TEST_BUILD = "-test" in APP_VERSION
 DEFAULT_API_BASE = "https://test.buyali.xyz" if IS_TEST_BUILD else "https://buyali.xyz"
 API_BASE = os.environ.get("BUYALI_API_BASE", DEFAULT_API_BASE).rstrip("/")
@@ -264,16 +264,25 @@ class ApiClient:
         except ApiError as exc:
             if not exc.uncertain:
                 raise
-            # A lost response does not mean a lost write. Query the idempotency
-            # record before presenting the operation as failed.
+            # The stable request ID makes one retry safe: if the first request
+            # committed but its response was lost, the server returns the
+            # original result instead of applying the capture twice.
+            log_event("apply_retry", requestId=payload["requestId"], reason="uncertain_first_response")
             try:
-                status = self.request("GET", "request-status?requestId=" + payload["requestId"])
-                if status.get("committed") and status.get("result"):
-                    log_event("apply_reconciled", requestId=payload["requestId"])
-                    return status["result"]
-            except ApiError as status_error:
-                log_event("apply_reconcile_failed", requestId=payload["requestId"], errorType=type(status_error).__name__)
-            raise exc
+                return self.request("POST", "apply", payload)
+            except ApiError as retry_error:
+                if not retry_error.uncertain:
+                    raise
+                # Both responses were uncertain. Query the server's
+                # idempotency record before reporting failure.
+                try:
+                    status = self.request("GET", "request-status?requestId=" + payload["requestId"])
+                    if status.get("committed") and status.get("result"):
+                        log_event("apply_reconciled", requestId=payload["requestId"])
+                        return status["result"]
+                except ApiError as status_error:
+                    log_event("apply_reconcile_failed", requestId=payload["requestId"], errorType=type(status_error).__name__)
+                raise retry_error
 
     def undo(self, transaction_id):
         return self.request("POST", "undo", {"transactionId": transaction_id})

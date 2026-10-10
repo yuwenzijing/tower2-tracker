@@ -114,6 +114,8 @@ class CollectorInteractionTests(unittest.TestCase):
 
     def test_apply_timeout_is_reconciled_by_request_id(self):
         self.assertIn('payload.setdefault("requestId", str(uuid.uuid4()))', APP_SOURCE)
+        self.assertIn('log_event("apply_retry"', APP_SOURCE)
+        self.assertGreaterEqual(APP_SOURCE.count('self.request("POST", "apply", payload)'), 2)
         self.assertIn('"request-status?requestId="', APP_SOURCE)
         self.assertIn("route === 'request-status'", WORKER_SOURCE)
 
